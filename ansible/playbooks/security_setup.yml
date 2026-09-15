@@ -1,0 +1,54 @@
+---
+- name: Настройка безопасности (SSH + Firewall)
+  hosts: astra
+  become: yes
+  tasks:
+    - name: Добавить публичный SSH-ключ пользователя astra
+      authorized_key:
+        user: astra
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Отключить парольную аутентификацию в SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+      notify: restart ssh
+
+    - name: Запретить вход root с паролем
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin prohibit-password'
+        state: present
+      notify: restart ssh
+
+    - name: Установить ufw
+      apt:
+        name: ufw
+        state: present
+
+    - name: Разрешить SSH (порт 22)
+      ufw:
+        rule: allow
+        port: ssh
+        proto: tcp
+
+    - name: Разрешить HTTP и HTTPS (порты 80,443) – для будущего веб-сервера
+      ufw:
+        rule: allow
+        port: '80,443'
+        proto: tcp
+
+    - name: Включить ufw с политикой запрета всех входящих по умолчанию
+      ufw:
+        state: enabled
+        policy: deny
+
+  handlers:
+    - name: restart ssh
+      systemd:
+        name: ssh
+        state: restarted

@@ -1,0 +1,15 @@
+# Пример переменных для Proxmox.
+# Скопируй этот файл в terraform.tfvars и подставь реальные значения.
+# Реальный terraform.tfvars лежит ВНЕ репозитория:
+#   /home/roman/infra-state/proxmox-test/terraform.tfvars
+# Он в .gitignore и в GitHub не попадает.
+
+# Обязательные переменные
+proxmox_token_id     = "terraform@pve!terraform-token"
+proxmox_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Опциональные (раскомментируй, если нужно переопределить дефолт)
+# proxmox_api_url  = "https://172.16.0.199:8006/api2/json"
+# proxmox_user     = "terraform@pve"
+# proxmox_insecure = true
+# proxmox_timeout  = 120

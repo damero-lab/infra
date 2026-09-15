@@ -1,0 +1,189 @@
+---
+- name: Развернуть стек приложений в Docker Compose (с установкой Docker)
+  hosts: astra
+  become: yes
+  tasks:
+    # 1. Установка Docker через официальный скрипт (если не установлен)
+    - name: Установить Docker (официальный скрипт)
+      shell: |
+        curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+      register: docker_install
+
+    - name: Добавить пользователя astra в группу docker
+      user:
+        name: astra
+        groups: docker
+        append: yes
+      when: docker_install is changed or docker_install is succeeded
+
+    - name: Установить Docker Compose (бинарник)
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
+        dest: /usr/local/bin/docker-compose
+        mode: 0755
+      register: compose_download
+      until: compose_download is succeeded
+      retries: 3
+      delay: 5
+
+    - name: Проверить версию Docker и Compose
+      command: "{{ item }} --version"
+      loop:
+        - docker
+        - docker-compose
+      register: version_check
+      changed_when: false
+
+    - name: Вывести версии
+      debug:
+        var: version_check.results
+
+    # 2. Создать директории
+    - name: Создать директории /opt/app и /opt/app/html
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: 0755
+      loop:
+        - /opt/app
+        - /opt/app/html
+
+    # 3. Создать docker-compose.yml
+    - name: Создать docker-compose.yml
+      copy:
+        dest: /opt/app/docker-compose.yml
+        content: |
+          version: '3.8'
+
+          services:
+            postgres:
+              image: postgres:15
+              container_name: postgres
+              restart: always
+              environment:
+                POSTGRES_USER: user
+                POSTGRES_PASSWORD: password
+                POSTGRES_DB: mydb
+              ports:
+                - "5432:5432"
+              volumes:
+                - postgres_data:/var/lib/postgresql/data
+              networks:
+                - app_network
+
+            redis:
+              image: redis:7-alpine
+              container_name: redis
+              restart: always
+              ports:
+                - "6379:6379"
+              networks:
+                - app_network
+
+            app:
+              image: nginx:alpine
+              container_name: app
+              restart: always
+              ports:
+                - "8080:80"
+              volumes:
+                - ./html:/usr/share/nginx/html
+              networks:
+                - app_network
+
+          volumes:
+            postgres_data:
+
+          networks:
+            app_network:
+              driver: bridge
+        mode: 0644
+
+    # 4. Создать тестовую HTML-страницу
+    - name: Создать тестовую страницу index.html
+      copy:
+        dest: /opt/app/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <meta charset="UTF-8">
+          <head><title>Тестовое приложение</title></head>
+          <body>
+            <h1>Hello from container!</h1>
+            <p>Стек работает: Nginx (хост) -> контейнер с Nginx (приложение)</p>
+            <p>PostgreSQL и Redis также запущены.</p>
+          </body>
+          </html>
+        mode: 0644
+
+    # 5. Запустить контейнеры через docker compose
+    - name: Запустить Docker Compose стек
+      shell:
+        cmd: docker-compose up -d
+        chdir: /opt/app
+      register: compose_result
+      changed_when: "'Creating' in compose_result.stdout or 'Recreating' in compose_result.stdout"
+
+    # 6. Настроить Nginx на хосте как reverse-proxy
+    - name: Создать конфигурацию Nginx для прокси на контейнер
+      copy:
+        dest: /etc/nginx/sites-available/app
+        content: |
+          server {
+              listen 80 default_server;
+              server_name _;
+
+              location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+        mode: 0644
+      notify: restart nginx
+
+    - name: Включить сайт (создать симлинк)
+      file:
+        src: /etc/nginx/sites-available/app
+        dest: /etc/nginx/sites-enabled/app
+        state: link
+      notify: restart nginx
+
+    - name: Удалить дефолтный сайт (если есть)
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: restart nginx
+
+    # 7. Проверить статус контейнеров
+    - name: Проверить статус контейнеров
+      shell: |
+        docker ps --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+      register: docker_ps
+      changed_when: false
+
+    - name: Вывести статус контейнеров
+      debug:
+        var: docker_ps.stdout_lines
+
+    # 8. Проверить, что страница доступна
+    - name: Проверить доступность страницы через localhost
+      uri:
+        url: http://localhost
+        status_code: 200
+      register: page_check
+      until: page_check.status == 200
+      retries: 3
+      delay: 5
+
+    - name: Вывести результат проверки страницы
+      debug:
+        msg: "Страница доступна, статус {{ page_check.status }}"
+
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted

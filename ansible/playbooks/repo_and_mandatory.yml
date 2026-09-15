@@ -1,0 +1,31 @@
+---
+- name: Настройка локального репозитория и отключение nochmodx
+  hosts: astra
+  become: yes
+  tasks:
+    - name: Заменить sources.list на локальный репозиторий
+      copy:
+        dest: /etc/apt/sources.list
+        content: |
+          deb http://172.16.0.248/repo 1.8_x86-64 main contrib non-free non-free-firmware
+        backup: yes
+      register: sources_changed
+
+    - name: Обновить кэш apt (если sources.list изменён)
+      apt:
+        update_cache: yes
+      when: sources_changed.changed
+
+    - name: Отключить nochmodx в parsec.conf (закомментировать строку)
+      lineinfile:
+        path: /etc/parsec/parsec.conf
+        regexp: '^nochmodx'
+        line: '#nochmodx'
+        backup: yes
+      register: parsec_changed
+
+    - name: Перезапустить службу parsec (для применения изменений)
+      systemd:
+        name: parsec
+        state: restarted
+      when: parsec_changed.changed

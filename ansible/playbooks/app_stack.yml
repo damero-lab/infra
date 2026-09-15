@@ -1,0 +1,62 @@
+---
+- name: Установка стека приложений (только из официальных репозиториев Astra)
+  hosts: astra
+  become: yes
+  tasks:
+    # 1. Обновляем кэш apt
+    - name: Обновить кэш apt
+      apt:
+        update_cache: yes
+
+    # 2. Установка базовых утилит
+    - name: Установить базовые пакеты
+      apt:
+        name:
+          - git
+          - curl
+          - vim
+          - tree
+          - htop
+          - net-tools
+          - wget
+          - python3-pip
+          - python3-venv
+        state: present
+
+    # 3. Nginx
+    - name: Установить Nginx
+      apt:
+        name: nginx
+        state: present
+    - name: Запустить и включить Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    # 4. PostgreSQL
+    - name: Установить PostgreSQL
+      apt:
+        name: postgresql postgresql-contrib
+        state: present
+    - name: Запустить и включить PostgreSQL
+      systemd:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    # 5. Redis
+    - name: Установить Redis
+      apt:
+        name: redis-server
+        state: present
+    - name: Запустить и включить Redis
+      systemd:
+        name: redis-server
+        state: started
+        enabled: yes
+
+    # 6. (Опционально) Если нужен Node.js — установим позже вручную
+    # 7. (Опционально) Docker — установим позже
+    # 8. (Опционально) Zabbix Agent — установим позже
+    # 9. (Опционально) Prometheus Node Exporter — установим позже

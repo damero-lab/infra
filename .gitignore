@@ -1,11 +1,18 @@
 # Terraform
 *.tfstate
 *.tfstate.*
+*.tfstate.lock.info
 .terraform/
-.terraform.lock.hcl
 *.tfvars
-!example.tfvars
+!*.tfvars.example
 crash.log
+*.tfplan
+*.tfplan.*
+terraform_*_linux_amd64.zip
+
+# Terraform CLI (локальные настройки)
+.terraformrc
+.terraform.d/
 
 # Ansible
 *.retry

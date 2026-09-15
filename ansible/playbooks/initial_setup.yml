@@ -1,0 +1,20 @@
+---
+- name: Первоначальная настройка Astra Linux
+  hosts: astra
+  become: yes
+  tasks:
+    - name: Обновить кэш пакетов apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Установить NTP (chrony)
+      apt:
+        name: chrony
+        state: present
+
+    - name: Запустить и включить chrony
+      systemd:
+        name: chrony
+        state: started
+        enabled: yes

@@ -1,0 +1,41 @@
+---
+- name: Сбор информации об Astra Linux
+  hosts: astra
+  become: yes
+  tasks:
+    - name: Проверить статус мандатного доступа (PARSEC)
+      command: pdpl-file -v /etc/passwd
+      register: pdpl_output
+      ignore_errors: yes
+
+    - name: Вывести информацию о мандатных метках
+      debug:
+        var: pdpl_output.stdout_lines
+
+    - name: Проверить настройки блокировки nochmodx
+      command: cat /etc/parsec/parsec.conf | grep -i nochmodx
+      register: nochmodx_output
+      ignore_errors: yes
+
+    - name: Вывести настройки nochmodx
+      debug:
+        var: nochmodx_output.stdout_lines
+
+    - name: Показать список репозиториев apt
+      command: cat /etc/apt/sources.list
+      register: sources_list
+      ignore_errors: yes
+
+    - name: Вывести содержимое sources.list
+      debug:
+        var: sources_list.stdout_lines
+
+    - name: Показать дополнительные репозитории (если есть)
+      command: ls -la /etc/apt/sources.list.d/
+      register: sources_d
+      ignore_errors: yes
+
+    - name: Вывести содержимое sources.list.d
+      debug:
+        var: sources_d.stdout_lines
+
