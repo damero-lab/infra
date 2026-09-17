@@ -1,0 +1,35 @@
+name: Hello from runner
+
+# Ручной запуск из UI GitHub
+on:
+  workflow_dispatch:
+
+jobs:
+  hello:
+    # Наш self-hosted runner с меткой mgmt
+    runs-on: [self-hosted, mgmt]
+
+    steps:
+      - name: Info about runner
+        run: |
+          echo "Hostname: $(hostname)"
+          echo "User:     $(whoami)"
+          echo "PWD:      $(pwd)"
+          echo "Date:     $(date)"
+          echo "Uptime:   $(uptime)"
+
+      - name: Check tools
+        run: |
+          echo "--- git ---"
+          git --version
+          echo "--- terraform ---"
+          terraform version
+          echo "--- ansible ---"
+          ansible --version | head -1
+          echo "--- docker ---"
+          docker --version
+          echo "--- jq ---"
+          jq --version
+
+      - name: Greeting
+        run: echo "Hello from mgmt-runner-01! Всё работает 🎉"
