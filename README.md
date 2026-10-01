@@ -20,5 +20,5 @@ Terraform and Ansible for my Proxmox homelab.
 
 
 
-Code lives in this repo. Edit from any machine, push, then pull on mgmt to apply. 
+Code lives in this repo. Edit from any machine, push, then pull on mgmt to apply.
 
