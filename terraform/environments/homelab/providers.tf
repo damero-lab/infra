@@ -15,8 +15,4 @@ provider "proxmox" {
 
   # Игнорировать ошибки SSL (самоподписанный сертификат Proxmox)
   insecure = var.proxmox_insecure
-
-  # Таймаут для API-запросов (в секундах)
-  # Увеличенный таймаут нужен для медленных операций (клонирование, старт VM)
-  timeout = var.proxmox_timeout
 }
