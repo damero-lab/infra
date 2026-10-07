@@ -5,6 +5,7 @@
 .terraform/
 *.tfvars
 !*.tfvars.example
+!vms.auto.tfvars
 crash.log
 *.tfplan
 *.tfplan.*
