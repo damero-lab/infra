@@ -1,0 +1,106 @@
+# =============================================================================
+# Роль: common — базовая настройка Linux-хоста
+#
+# Порядок задач:
+#   1. Обновление apt cache
+#   2. Timezone
+#   3. NTP (chrony)
+#   4. Базовые пакеты
+#   5. SSH hardening
+#   6. UFW (firewall)
+#
+# Все задачи идемпотентны — повторный запуск не сломает систему.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Обновление кэша apt
+# -----------------------------------------------------------------------------
+- name: Обновить кэш apt
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600  # не обновлять, если кэш свежее 1 часа
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. Часовой пояс
+# -----------------------------------------------------------------------------
+- name: Установить часовой пояс
+  community.general.timezone:
+    name: "{{ timezone }}"
+  become: true
+
+# -----------------------------------------------------------------------------
+# 3. NTP (chrony) — синхронизация времени
+# -----------------------------------------------------------------------------
+- name: Установить пакет NTP
+  ansible.builtin.apt:
+    name: "{{ ntp_package }}"
+    state: present
+  become: true
+
+- name: Включить и запустить NTP-сервис
+  ansible.builtin.systemd:
+    name: "{{ ntp_service }}"
+    state: started
+    enabled: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 4. Базовые пакеты
+# -----------------------------------------------------------------------------
+- name: Установить базовые пакеты
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+  become: true
+
+# -----------------------------------------------------------------------------
+# 5. SSH hardening
+# -----------------------------------------------------------------------------
+- name: Запретить вход root по паролю (PermitRootLogin)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: "PermitRootLogin {{ ssh_permit_root_login }}"
+    state: present
+    validate: /usr/sbin/sshd -t -f %s
+  become: true
+  notify: restart ssh
+
+- name: Отключить вход по паролю (PasswordAuthentication)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: "PasswordAuthentication {{ ssh_password_authentication }}"
+    state: present
+    validate: /usr/sbin/sshd -t -f %s
+  become: true
+  notify: restart ssh
+
+# -----------------------------------------------------------------------------
+# 6. UFW — firewall
+# -----------------------------------------------------------------------------
+- name: Установить UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  become: true
+  when: ufw_enabled
+
+- name: Разрешить порты в UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment | default('') }}"
+  loop: "{{ ufw_allowed_ports }}"
+  become: true
+  when: ufw_enabled
+
+- name: Включить UFW с политикой deny по умолчанию
+  community.general.ufw:
+    state: enabled
+    policy: "{{ ufw_default_policy }}"
+    direction: incoming
+  become: true
+  when: ufw_enabled
