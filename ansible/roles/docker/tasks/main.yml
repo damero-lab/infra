@@ -1,0 +1,107 @@
+# =============================================================================
+# Роль: docker — установка Docker Engine + Docker Compose v2
+#
+# Устанавливает Docker из официального репозитория download.docker.com.
+# Настраивает daemon.json, запускает сервис, добавляет пользователя в группу.
+#
+# Порядок:
+#   1. Зависимости для добавления репозитория (ca-certificates, curl)
+#   2. GPG-ключ Docker
+#   3. apt-репозиторий Docker
+#   4. Установка пакетов
+#   5. daemon.json (логи, live-restore)
+#   6. Сервис Docker
+#   7. Пользователь в группу docker
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Базовые пакеты для работы с репозиторием
+# -----------------------------------------------------------------------------
+- name: Установить зависимости для добавления apt-репозитория
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. Папка для ключей
+# -----------------------------------------------------------------------------
+- name: Создать папку /etc/apt/keyrings
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  become: true
+
+# -----------------------------------------------------------------------------
+# 3. GPG-ключ Docker
+# -----------------------------------------------------------------------------
+- name: Скачать GPG-ключ Docker
+  ansible.builtin.get_url:
+    url: "{{ docker_apt_gpg_key_url }}"
+    dest: "{{ docker_apt_gpg_key_path }}"
+    mode: "0644"
+    force: false
+  become: true
+
+# -----------------------------------------------------------------------------
+# 4. apt-репозиторий Docker
+# -----------------------------------------------------------------------------
+- name: Добавить apt-репозиторий Docker
+  ansible.builtin.apt_repository:
+    repo: "{{ docker_apt_repository }}"
+    filename: docker
+    state: present
+    update_cache: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 5. Установка пакетов Docker
+# -----------------------------------------------------------------------------
+- name: Установить пакеты Docker
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+  become: true
+
+# -----------------------------------------------------------------------------
+# 6. Настройка daemon.json
+# -----------------------------------------------------------------------------
+- name: Создать папку /etc/docker
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Настроить /etc/docker/daemon.json
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_config | to_nice_json }}\n"
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  become: true
+  notify: restart docker
+
+# -----------------------------------------------------------------------------
+# 7. Сервис Docker
+# -----------------------------------------------------------------------------
+- name: Включить и запустить Docker
+  ansible.builtin.systemd:
+    name: "{{ docker_service_name }}"
+    state: started
+    enabled: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 8. Пользователи в группу docker
+# -----------------------------------------------------------------------------
+- name: Добавить пользователей в группу docker
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+  become: true

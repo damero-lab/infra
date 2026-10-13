@@ -1,0 +1,45 @@
+# =============================================================================
+# Default variables для роли docker
+#
+# Установка Docker Engine и Docker Compose v2 (plugin) из официального
+# репозитория Docker.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Репозиторий Docker
+# -----------------------------------------------------------------------------
+# Astra Linux основана на Debian 12 (bookworm).
+# Используем официальный репозиторий Docker для Debian bookworm.
+docker_apt_release_channel: stable
+docker_apt_release: bookworm
+docker_apt_repository: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ docker_apt_release }} {{ docker_apt_release_channel }}"
+docker_apt_gpg_key_url: "https://download.docker.com/linux/debian/gpg"
+docker_apt_gpg_key_path: /etc/apt/keyrings/docker.asc
+
+# -----------------------------------------------------------------------------
+# Пакеты Docker
+# -----------------------------------------------------------------------------
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# -----------------------------------------------------------------------------
+# Настройки Docker daemon (/etc/docker/daemon.json)
+# -----------------------------------------------------------------------------
+docker_daemon_config:
+  log-driver: journald          # логи в systemd-journald (не в файлы)
+  live-restore: true            # контейнеры продолжают работать при перезапуске daemon
+
+# -----------------------------------------------------------------------------
+# Пользователи для добавления в группу docker
+# -----------------------------------------------------------------------------
+docker_users:
+  - roman
+
+# -----------------------------------------------------------------------------
+# Сервис Docker (systemd)
+# -----------------------------------------------------------------------------
+docker_service_name: docker
