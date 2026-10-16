@@ -1,0 +1,70 @@
+# =============================================================================
+# Zabbix Stack — Docker Compose
+#
+# Шаблон Jinja2. Ansible подставит переменные из defaults/main.yml
+# и .env при деплое.
+#
+# Сервисы:
+#   - postgres          — БД Zabbix
+#   - zabbix-server     — мозг (сбор метрик, триггеры)
+#   - zabbix-web        — веб-UI (frontend)
+# =============================================================================
+
+services:
+  postgres:
+    image: {{ zabbix_postgres_image }}
+    container_name: zabbix-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: {{ zabbix_db_user }}
+      POSTGRES_PASSWORD: {{ zabbix_db_password }}
+      POSTGRES_DB: {{ zabbix_db_name }}
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    networks:
+      - zabbix-net
+    # Порт 5432 НЕ открываем наружу — БД только для Zabbix
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ zabbix_db_user }} -d {{ zabbix_db_name }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zabbix-server:
+    image: {{ zabbix_server_image }}
+    container_name: zabbix-server
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_SERVER_HOST: postgres
+      POSTGRES_USER: {{ zabbix_db_user }}
+      POSTGRES_PASSWORD: {{ zabbix_db_password }}
+      POSTGRES_DB: {{ zabbix_db_name }}
+    ports:
+      - "{{ zabbix_server_port }}:10051"
+    networks:
+      - zabbix-net
+
+  zabbix-web:
+    image: {{ zabbix_web_image }}
+    container_name: zabbix-web
+    restart: always
+    depends_on:
+      - zabbix-server
+    environment:
+      ZBX_SERVER_HOST: zabbix-server
+      DB_SERVER_HOST: postgres
+      POSTGRES_USER: {{ zabbix_db_user }}
+      POSTGRES_PASSWORD: {{ zabbix_db_password }}
+      POSTGRES_DB: {{ zabbix_db_name }}
+      PHP_TZ: {{ zabbix_php_timezone }}
+    ports:
+      - "{{ zabbix_web_port }}:8080"
+    networks:
+      - zabbix-net
+
+networks:
+  zabbix-net:
+    driver: bridge

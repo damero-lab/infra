@@ -1,0 +1,100 @@
+# =============================================================================
+# Роль: zabbix-server — развёртывание Zabbix в Docker Compose
+#
+# Стек:
+#   - postgres       (БД)
+#   - zabbix-server  (мозг)
+#   - zabbix-web     (веб UI)
+#
+# Порядок:
+#   1. Создать папку /opt/zabbix/
+#   2. Создать папку /opt/zabbix/volumes/postgres/
+#   3. Скопировать docker-compose.yml (из templates)
+#   4. Скопировать .env (секреты из Vault)
+#   5. Запустить docker compose up -d
+#   6. Открыть порты в UFW
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Папки для стека
+# -----------------------------------------------------------------------------
+- name: Создать папку для Zabbix-стека
+  ansible.builtin.file:
+    path: "{{ zabbix_stack_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Создать папку для volumes PostgreSQL
+  ansible.builtin.file:
+    path: "{{ zabbix_stack_dir }}/volumes/postgres"
+    state: directory
+    mode: "0755"
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. docker-compose.yml
+# -----------------------------------------------------------------------------
+- name: Скопировать docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ zabbix_stack_dir }}/docker-compose.yml"
+    mode: "0644"
+  become: true
+  notify: restart zabbix stack
+
+# -----------------------------------------------------------------------------
+# 3. .env (с секретами из Vault)
+# -----------------------------------------------------------------------------
+- name: Скопировать .env
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ zabbix_stack_dir }}/.env"
+    mode: "0600"
+  become: true
+  notify: restart zabbix stack
+
+# -----------------------------------------------------------------------------
+# 4. Запуск стека
+# -----------------------------------------------------------------------------
+- name: Запустить Zabbix stack (docker compose up)
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ zabbix_stack_dir }}"
+  become: true
+  register: compose_up
+  changed_when: "'Started' in compose_up.stderr or 'Created' in compose_up.stderr or 'Recreated' in compose_up.stderr"
+
+# -----------------------------------------------------------------------------
+# 5. UFW — открыть порты
+# -----------------------------------------------------------------------------
+- name: Открыть порт Zabbix Server в UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ zabbix_server_port }}"
+    proto: tcp
+    comment: "Zabbix Server"
+  become: true
+  when: ufw_enabled | default(false)
+
+- name: Открыть порт Zabbix Web в UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ zabbix_web_port }}"
+    proto: tcp
+    comment: "Zabbix Web UI"
+  become: true
+  when: ufw_enabled | default(false)
+
+# -----------------------------------------------------------------------------
+# 6. Проверка готовности Frontend
+# -----------------------------------------------------------------------------
+- name: Подождать готовности Zabbix Web
+  ansible.builtin.uri:
+    url: "http://localhost:{{ zabbix_web_port }}"
+    status_code: 200
+  register: web_check
+  until: web_check.status == 200
+  retries: 12
+  delay: 10
+  changed_when: false
