@@ -1,0 +1,11 @@
+# =============================================================================
+# Handlers для роли zabbix-server
+#
+# Перезапуск стека при изменении docker-compose.yml или .env
+# =============================================================================
+
+- name: restart zabbix stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ zabbix_stack_dir }}"
+  become: true
