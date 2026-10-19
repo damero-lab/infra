@@ -5,9 +5,9 @@
 # и отправляет на Zabbix Server.
 #
 # Порядок:
-#   1. Зависимости для работы с репозиторием
-#   2. GPG-ключ Zabbix
-#   3. apt-репозиторий Zabbix
+#   1. Зависимости (wget, gnupg, ca-certificates)
+#   2. Скачивание .deb пакета zabbix-release
+#   3. Установка .deb (автоматически добавляет ключ и репозиторий)
 #   4. Установка zabbix-agent2
 #   5. Конфиг (Server, Hostname, Port)
 #   6. Запуск сервиса
@@ -15,44 +15,34 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# 1. Зависимости для добавления apt-репозитория
+# 1. Зависимости для работы с репозиторием
 # -----------------------------------------------------------------------------
-- name: Установить зависимости для apt-репозитория Zabbix
+- name: Установить зависимости для работы с репозиторием
   ansible.builtin.apt:
     name:
       - ca-certificates
       - curl
       - gnupg
+      - wget
     state: present
   become: true
 
 # -----------------------------------------------------------------------------
-# 2. GPG-ключ Zabbix
+# 2. Скачать .deb пакет релиза Zabbix
 # -----------------------------------------------------------------------------
-- name: Создать папку /etc/apt/keyrings
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: "0755"
-  become: true
-
-- name: Скачать GPG-ключ Zabbix
+- name: Скачать пакет zabbix-release
   ansible.builtin.get_url:
-    url: "{{ zabbix_agent_apt_gpg_key_url }}"
-    dest: "{{ zabbix_agent_apt_gpg_key_path }}"
+    url: "{{ zabbix_agent_release_deb_url }}"
+    dest: /tmp/zabbix-release.deb
     mode: "0644"
-    force: false
   become: true
 
 # -----------------------------------------------------------------------------
-# 3. apt-репозиторий Zabbix
+# 3. Установить .deb пакет релиза Zabbix
 # -----------------------------------------------------------------------------
-- name: Добавить apt-репозиторий Zabbix
-  ansible.builtin.apt_repository:
-    repo: "{{ zabbix_agent_apt_repository }}"
-    filename: zabbix
-    state: present
-    update_cache: true
+- name: Установить пакет zabbix-release
+  ansible.builtin.apt:
+    deb: /tmp/zabbix-release.deb
   become: true
 
 # -----------------------------------------------------------------------------

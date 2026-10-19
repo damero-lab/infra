@@ -11,14 +11,12 @@
 zabbix_agent_version: "7.0"
 
 # -----------------------------------------------------------------------------
-# Репозиторий Zabbix
+# Репозиторий Zabbix (используем официальный .deb пакет релиза)
 #
 # Astra Linux основана на Debian 12 (bookworm).
+# Пакет zabbix-release автоматически ставит GPG-ключ и правильный URL репозитория.
 # -----------------------------------------------------------------------------
-zabbix_agent_apt_release: bookworm
-zabbix_agent_apt_repository: "deb [arch=amd64 signed-by=/etc/apt/keyrings/zabbix.asc] https://repo.zabbix.com/zabbix/{{ zabbix_agent_version }}/debian {{ zabbix_agent_apt_release }} main"
-zabbix_agent_apt_gpg_key_url: "https://repo.zabbix.com/zabbix-official-repo-apr2024.gpg"
-zabbix_agent_apt_gpg_key_path: /etc/apt/keyrings/zabbix.asc
+zabbix_agent_release_deb_url: "https://repo.zabbix.com/zabbix/{{ zabbix_agent_version }}/debian/pool/main/z/zabbix-release/zabbix-release_latest_{{ zabbix_agent_version }}+debian12_all.deb"
 
 # -----------------------------------------------------------------------------
 # Пакет
