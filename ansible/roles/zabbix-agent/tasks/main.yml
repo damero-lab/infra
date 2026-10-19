@@ -1,0 +1,101 @@
+# =============================================================================
+# Роль: zabbix-agent — установка Zabbix Agent 2 нативно
+#
+# Агент собирает метрики хоста (CPU, RAM, диск, сеть, процессы)
+# и отправляет на Zabbix Server.
+#
+# Порядок:
+#   1. Зависимости для работы с репозиторием
+#   2. GPG-ключ Zabbix
+#   3. apt-репозиторий Zabbix
+#   4. Установка zabbix-agent2
+#   5. Конфиг (Server, Hostname, Port)
+#   6. Запуск сервиса
+#   7. UFW — открыть 10050 только для Zabbix Server
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Зависимости для добавления apt-репозитория
+# -----------------------------------------------------------------------------
+- name: Установить зависимости для apt-репозитория Zabbix
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. GPG-ключ Zabbix
+# -----------------------------------------------------------------------------
+- name: Создать папку /etc/apt/keyrings
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Скачать GPG-ключ Zabbix
+  ansible.builtin.get_url:
+    url: "{{ zabbix_agent_apt_gpg_key_url }}"
+    dest: "{{ zabbix_agent_apt_gpg_key_path }}"
+    mode: "0644"
+    force: false
+  become: true
+
+# -----------------------------------------------------------------------------
+# 3. apt-репозиторий Zabbix
+# -----------------------------------------------------------------------------
+- name: Добавить apt-репозиторий Zabbix
+  ansible.builtin.apt_repository:
+    repo: "{{ zabbix_agent_apt_repository }}"
+    filename: zabbix
+    state: present
+    update_cache: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 4. Установка zabbix-agent2
+# -----------------------------------------------------------------------------
+- name: Установить zabbix-agent2
+  ansible.builtin.apt:
+    name: "{{ zabbix_agent_package }}"
+    state: present
+  become: true
+
+# -----------------------------------------------------------------------------
+# 5. Конфиг агента
+# -----------------------------------------------------------------------------
+- name: Развернуть zabbix_agent2.conf
+  ansible.builtin.template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  notify: restart zabbix-agent
+
+# -----------------------------------------------------------------------------
+# 6. Сервис
+# -----------------------------------------------------------------------------
+- name: Включить и запустить zabbix-agent2
+  ansible.builtin.systemd:
+    name: "{{ zabbix_agent_service }}"
+    state: started
+    enabled: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 7. UFW — открыть порт 10050 только для Zabbix Server
+# -----------------------------------------------------------------------------
+- name: Открыть порт 10050 в UFW для Zabbix Server
+  community.general.ufw:
+    rule: allow
+    port: "{{ zabbix_agent_port }}"
+    proto: tcp
+    from_ip: "{{ zabbix_agent_server }}"
+    comment: "Zabbix Agent — приём метрик от Server"
+  become: true
+  when: ufw_enabled | default(false)

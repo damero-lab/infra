@@ -21,6 +21,7 @@
   roles:
     - common
     - docker
+    - zabbix-agent
 
 # -----------------------------------------------------------------------------
 # Zabbix Server — только на monitoring VM

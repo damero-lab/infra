@@ -1,0 +1,11 @@
+# =============================================================================
+# Handlers для роли zabbix-agent
+#
+# Перезапуск агента при изменении конфига.
+# =============================================================================
+
+- name: restart zabbix-agent
+  ansible.builtin.systemd:
+    name: "{{ zabbix_agent_service }}"
+    state: restarted
+  become: true
