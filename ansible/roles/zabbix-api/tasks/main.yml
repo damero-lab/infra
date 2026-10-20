@@ -34,6 +34,9 @@
   # ВАЖНО: выполняем на mgmt (контроллере), а не на VM mon
   delegate_to: localhost
 
+  # Модулю не нужны права root — он просто делает HTTP-запрос к API
+  become: false
+
   vars:
     ansible_connection: httpapi
     ansible_network_os: community.zabbix.zabbix
