@@ -2,32 +2,23 @@
 # Роль: zabbix-api
 #
 # Создаёт/обновляет хосты в Zabbix Server через API.
-# Работает через модуль community.zabbix.zabbix_host.
+# Использует HTTPAPI-плагин (ансибл-переменные с префиксом ansible_).
 # =============================================================================
 
 - name: Зарегистрировать и обновить хосты в Zabbix через API
   community.zabbix.zabbix_host:
-    server_url: "{{ zabbix_api_url }}"
-    login_user: "{{ zabbix_api_user }}"
-    login_password: "{{ zabbix_api_password }}"
-    
-    # Имя хоста (должно совпадать с Hostname в конфиге агента)
     host_name: "{{ item.name }}"
     visible_name: "{{ item.name }}"
-    
-    # Группа хостов
+
     host_groups:
       - "{{ zabbix_api_host_group }}"
-      
-    # Привязка шаблона (сбор метрик)
+
     link_templates:
       - "{{ zabbix_api_template }}"
-      
-    # Состояние: включен
+
     status: enabled
     state: present
-    
-    # Сетевой интерфейс
+
     interfaces:
       - type: 1          # 1 = Agent
         main: 1
@@ -35,5 +26,14 @@
         ip: "{{ item.ip }}"
         dns: ""
         port: "{{ zabbix_api_agent_port }}"
-        
+
   loop: "{{ zabbix_api_hosts }}"
+
+  # Параметры подключения для HTTPAPI-плагина
+  vars:
+    ansible_host: "{{ zabbix_api_host }}"
+    ansible_user: "{{ zabbix_api_user }}"
+    ansible_password: "{{ zabbix_api_password }}"
+    ansible_network_os: community.zabbix.zabbix
+    ansible_httpapi_use_ssl: "{{ zabbix_api_use_ssl }}"
+    ansible_httpapi_validate_certs: "{{ zabbix_api_validate_certs }}"
