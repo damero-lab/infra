@@ -2,9 +2,7 @@
 # Роль: zabbix-api
 #
 # Создаёт/обновляет хосты в Zabbix Server через API.
-# Использует HTTPAPI-плагин (ansible_connection: httpapi),
-# который выполняется на контроллере (localhost = mgmt) и
-# общается с Zabbix API по HTTP.
+# Параметры подключения берутся из inventory (группа zabbix_api).
 # =============================================================================
 
 - name: Зарегистрировать и обновить хосты в Zabbix через API
@@ -30,20 +28,3 @@
         port: "{{ zabbix_api_agent_port }}"
 
   loop: "{{ zabbix_api_hosts }}"
-
-  # ВАЖНО: выполняем на mgmt (контроллере), а не на VM mon
-  delegate_to: localhost
-
-  # Отключаем root, так как модуль просто делает HTTP-запрос
-  become: false
-
-  vars:
-    ansible_connection: httpapi
-    ansible_network_os: community.zabbix.zabbix
-    ansible_host: "{{ zabbix_api_host }}"
-    ansible_port: "{{ zabbix_api_port }}"
-    ansible_httpapi_path: "{{ zabbix_api_path }}"
-    ansible_user: "{{ zabbix_api_user }}"
-    ansible_password: "{{ zabbix_api_password }}"
-    ansible_httpapi_use_ssl: "{{ zabbix_api_use_ssl }}"
-    ansible_httpapi_validate_certs: "{{ zabbix_api_validate_certs }}"
