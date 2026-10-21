@@ -2,7 +2,6 @@
 # Роль: zabbix-api
 #
 # Создаёт/обновляет хосты в Zabbix Server через API.
-# Параметры подключения берутся из inventory (группа zabbix_api).
 # =============================================================================
 
 - name: Зарегистрировать и обновить хосты в Zabbix через API
@@ -26,5 +25,11 @@
         ip: "{{ item.ip }}"
         dns: ""
         port: "{{ zabbix_api_agent_port }}"
+
+    # --- ПРЯМОЕ ПОДКЛЮЧЕНИЕ (обходим баг плагина httpapi) ---
+    server_url: "http://172.16.0.200:8080"
+    login_user: "Admin"
+    login_password: "{{ vault_zabbix_admin_password }}"
+    # --------------------------------------------------------
 
   loop: "{{ zabbix_api_hosts }}"
