@@ -121,4 +121,4 @@
   loop: "{{ zabbix_api_hosts }}"
   loop_control:
     label: "{{ item.name }}"
-    when: existing_host.results[ansible_loop.index0].json.result | length == 0
+  when: existing_host.results[ansible_loop.index0].json.result | length == 0
