@@ -26,4 +26,4 @@
         dns: ""
         port: "{{ zabbix_api_agent_port }}"
 
-    loop: "{{ zabbix_api_hosts }}"
+  loop: "{{ zabbix_api_hosts }}"
