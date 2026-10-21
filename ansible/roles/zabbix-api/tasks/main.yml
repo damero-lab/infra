@@ -69,6 +69,10 @@
   register: existing_host
   loop: "{{ zabbix_api_hosts }}"
 
+- name: Сформировать список имен уже существующих хостов
+  ansible.builtin.set_fact:
+    existing_host_names: "{{ existing_host.results | selectattr('json.result', 'defined') | selectattr('json.result', 'ne', []) | map(attribute='item.name') | list }}"
+
 - name: Обновить существующий хост (например, изменить 127.0.0.1 на 172.16.0.200)
   ansible.builtin.uri:
     url: "http://172.16.0.200:8080/api_jsonrpc.php"
@@ -119,6 +123,4 @@
       id: 6
     status_code: 200
   loop: "{{ zabbix_api_hosts }}"
-  loop_control:
-    label: "{{ item.name }}"
-  when: existing_host.results[ansible_loop.index0].json.result | length == 0
+  when: item.name not in existing_host_names
