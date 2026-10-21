@@ -1,18 +1,8 @@
 # =============================================================================
 # Главный playbook homelab
-#
-# Применяет роли на группы хостов.
-#
-# Запуск:
-#   ansible-playbook playbooks/site.yml              # всё на всех
-#   ansible-playbook playbooks/site.yml -l mon       # только на mon
-#   ansible-playbook playbooks/site.yml -l app-01    # только на app-01
-#   ansible-playbook playbooks/site.yml --check      # проверка без изменений
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Базовая настройка всех VM (common + docker)
-# -----------------------------------------------------------------------------
+# Блок 1: Базовая настройка всех VM
 - name: Базовая настройка всех VM
   hosts: astra
   become: true
@@ -23,9 +13,7 @@
     - docker
     - zabbix-agent
 
-# -----------------------------------------------------------------------------
-# Zabbix Server — только на monitoring VM
-# -----------------------------------------------------------------------------
+# Блок 2: Zabbix Server на mon
 - name: Развернуть Zabbix на monitoring VM
   hosts: mon
   become: true
@@ -33,3 +21,11 @@
 
   roles:
     - zabbix-server
+
+# Блок 3: Настройка хостов в Zabbix через API
+- name: Настроить хосты в Zabbix через API
+  hosts: zabbix_api
+  gather_facts: false
+
+  roles:
+    - zabbix-api

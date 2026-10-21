@@ -1,0 +1,126 @@
+# =============================================================================
+# Роль: zabbix-api (Прямой вызов через ansible.builtin.uri)
+# =============================================================================
+
+- name: Авторизация в Zabbix API
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "user.login"
+      params:
+        username: "Admin"
+        password: "{{ vault_zabbix_admin_password }}"
+      id: 1
+    status_code: 200
+  register: zabbix_auth
+
+- name: Получить ID группы хостов
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: "hostgroup.get"
+      params:
+        filter:
+          name: "{{ zabbix_api_host_group }}"
+      id: 2
+    status_code: 200
+  register: zabbix_group
+
+- name: Получить ID шаблона
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: "template.get"
+      params:
+        filter:
+          host: "{{ zabbix_api_template }}"
+      id: 3
+    status_code: 200
+  register: zabbix_template
+
+- name: Проверить, существует ли уже хост
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: "host.get"
+      params:
+        filter:
+          host: "{{ item.name }}"
+      id: 4
+    status_code: 200
+  register: existing_host
+  loop: "{{ zabbix_api_hosts }}"
+
+- name: Сформировать список имен уже существующих хостов
+  ansible.builtin.set_fact:
+    existing_host_names: "{{ existing_host.results | selectattr('json.result', 'defined') | selectattr('json.result', 'ne', []) | map(attribute='item.name') | list }}"
+
+- name: Обновить существующий хост (например, изменить 127.0.0.1 на 172.16.0.200)
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: "host.update"
+      params:
+        hostid: "{{ item.json.result[0].hostid }}"
+        interfaces:
+          - type: 1
+            main: 1
+            useip: 1
+            ip: "{{ item.item.ip }}"
+            dns: ""
+            port: "{{ zabbix_api_agent_port }}"
+      id: 5
+    status_code: 200
+  loop: "{{ existing_host.results }}"
+  when: item.json.result | length > 0
+
+- name: Создать новый хост (если его еще нет)
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: "host.create"
+      params:
+        host: "{{ item.name }}"
+        interfaces:
+          - type: 1
+            main: 1
+            useip: 1
+            ip: "{{ item.ip }}"
+            dns: ""
+            port: "{{ zabbix_api_agent_port }}"
+        groups:
+          - groupid: "{{ zabbix_group.json.result[0].groupid }}"
+        templates:
+          - templateid: "{{ zabbix_template.json.result[0].templateid }}"
+      id: 6
+    status_code: 200
+  loop: "{{ zabbix_api_hosts }}"
+  when: item.name not in existing_host_names
