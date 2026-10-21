@@ -1,0 +1,15 @@
+# Секреты Terraform
+*.tfvars
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Секреты Ansible (обычно лежат в inventories или group_vars)
+inventories/
+*vault*
+*.pem
+*.key
+
+# Системный мусор
+.git/
+.vscode/
