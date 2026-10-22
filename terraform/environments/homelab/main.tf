@@ -60,3 +60,15 @@ module "vms" {
   ssh_public_key = var.ssh_public_key
   ansible_user   = "roman"
 }
+
+# =============================================================================
+# Генерация инвентаря для Ansible
+# =============================================================================
+resource "local_file" "ansible_inventory" {
+  content = templatefile("${path.module}/inventory.tpl", {
+    vms = var.vms
+  })
+  
+  # Путь к файлу hosts.yml в папке Ansible
+  filename = "${path.module}/../../../ansible/inventories/homelab/hosts.yml"
+}
