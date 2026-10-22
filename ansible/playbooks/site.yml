@@ -15,7 +15,7 @@
 
 # Блок 2: Zabbix Server на mon
 - name: Развернуть Zabbix на monitoring VM
-  hosts: mon
+  hosts: monitoring
   become: true
   gather_facts: true
 

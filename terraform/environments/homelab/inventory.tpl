@@ -13,8 +13,8 @@ all:
           ansible_host: ${replace(vm.ip_address, "/24", "")}
 %{ endfor ~}
 
-    # Группа для развертывания Zabbix Server
-    mon:
+    # Группа для развертывания Zabbix Server (переименована в monitoring)
+    monitoring:
       hosts:
         mon:
           ansible_host: ${replace(vms["mon"].ip_address, "/24", "")}
