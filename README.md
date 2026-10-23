@@ -33,6 +33,7 @@ graph TD
     
     app -.->|Метрики| z_srv
     mon -.->|Метрики| z_srv
+    ```
 
     🛠 Технологический стек
 Terraform: Создание VM (модуль vm), настройка cloud-init, автоматическая генерация Ansible inventory.
