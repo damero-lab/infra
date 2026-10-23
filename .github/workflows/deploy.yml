@@ -1,0 +1,38 @@
+name: Deploy Homelab Infrastructure
+
+# Ручной запуск из UI GitHub (работает и с телефона)
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # Используем ваш self-hosted runner на mgmt
+    runs-on: [self-hosted, mgmt]
+
+    steps:
+      - name: Update code from GitHub
+        run: |
+          echo "=== Обновляем код в ~/infra ==="
+          cd ~/infra
+          # Принудительно синхронизируем сервер с веткой main
+          git fetch origin
+          git reset --hard origin/main
+          git clean -fd
+
+      - name: Terraform Init and Apply
+        run: |
+          echo "=== Запускаем Terraform ==="
+          cd ~/infra/terraform/environments/homelab
+          # Флаг -auto-approve позволяет не вводить "yes" вручную
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Run Ansible Playbook
+        run: |
+          echo "=== Запускаем Ansible ==="
+          cd ~/infra/ansible
+          # Ansible подхватит пароль Vault из ~/.vault_pass (указан в ansible.cfg)
+          ansible-playbook playbooks/site.yml
+
+      - name: Success Message
+        run: echo "🎉 Инфраструктура успешно развернута!"
