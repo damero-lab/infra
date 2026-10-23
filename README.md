@@ -12,30 +12,22 @@
 
 ### Схема развертывания и CI/CD
 
-```mermaid
-graph TD
-    User([Инженер]) -->|Run workflow| GA[GitHub Actions<br>CI/CD Pipeline]
-    GA -->|Self-hosted Runner| mgmt[Управляющая VM: mgmt<br>172.16.0.248]
-    
-    mgmt -->|Terraform| Proxmox[Proxmox VE<br>172.16.0.199]
-    
-    Proxmox -->|Клонирование шаблона| mon[VM: mon<br>172.16.0.200]
-    Proxmox -->|Клонирование шаблона| app[VM: app-01<br>172.16.0.211]
-    
-    mgmt -->|Ansible| mon
-    mgmt -->|Ansible| app
-    
-    subgraph Zabbix [Zabbix Stack]
-        z_srv[Zabbix Server]
-        z_web[Zabbix Web]
-        z_db[PostgreSQL]
-    end
-    
-    app -.->|Метрики| z_srv
-    mon -.->|Метрики| z_srv
-    ```
+```text
+[Инженер] 
+    │ (Запускает Run workflow в GitHub)
+    ▼
+[GitHub Actions (CI/CD)] 
+    │ 
+    ▼
+[mgmt (Self-hosted Runner)] ───(Terraform)───► [Proxmox VE]
+    │                                              │
+    │                                              ├─► [VM mon (Zabbix Server)]
+    │                                              └─► [VM app-01 (Agent)]
+    │
+    └──(Ansible)───► [Настройка и мониторинг VM]
+       
+🛠 Технологический стек
 
-    🛠 Технологический стек
 Terraform: Создание VM (модуль vm), настройка cloud-init, автоматическая генерация Ansible inventory.
 
 Ansible: Настройка ОС (hardening, UFW), установка Docker, развертывание Zabbix, регистрация хостов через API.
