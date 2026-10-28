@@ -13,7 +13,7 @@ vms = {
   # Тестовая VM — проверка Terraform-модуля
   # --------------------------------------------------------------------------
   app-01 = {
-    template_id = 101                # astra-template
+    template_id = 101 # astra-template
     ip_address  = "172.16.0.211/24"
     tags        = ["test", "terraform"]
     # cores, memory, disk_size — не указаны, берутся дефолты (2 / 2048 / 20)
@@ -23,9 +23,9 @@ vms = {
   # VM мониторинга — в будущем будет Zabbix/Prometheus/Grafana
   # --------------------------------------------------------------------------
   mon = {
-    template_id = 101                # astra-template
+    template_id = 101 # astra-template
     ip_address  = "172.16.0.200/24"
-    memory      = 3072               # 3 GiB — больше, чем у обычной
+    memory      = 3072 # 3 GiB — больше, чем у обычной
     tags        = ["monitoring"]
     # cores, disk_size — дефолты (2 / 20)
   }
@@ -34,10 +34,10 @@ vms = {
   # VM для Prometheus + Grafana (стек мониторинга, отдельно от Zabbix на mon)
   # --------------------------------------------------------------------------
   prom = {
-    template_id = 101                # astra-template
+    template_id = 101 # astra-template
     ip_address  = "172.16.0.201/24"
-    memory      = 3072               # 3 GiB — Grafana + Prometheus + TSDB
-    disk_size   = 40                 # больше дефолта: TSDB Prometheus растёт
+    memory      = 3072 # 3 GiB — Grafana + Prometheus + TSDB
+    disk_size   = 40   # больше дефолта: TSDB Prometheus растёт
     tags        = ["monitoring", "prometheus"]
     # cores — дефолт (2)
   }

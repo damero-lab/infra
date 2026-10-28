@@ -6,7 +6,7 @@ terraform {
       source  = "bpg/proxmox"
       version = ">= 0.50.0"
     }
-    
+
     # Плагин для сохранения файла:
     local = {
       source  = "hashicorp/local"
