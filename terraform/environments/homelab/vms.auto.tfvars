@@ -29,4 +29,16 @@ vms = {
     tags        = ["monitoring"]
     # cores, disk_size — дефолты (2 / 20)
   }
+
+  # --------------------------------------------------------------------------
+  # VM для Prometheus + Grafana (стек мониторинга, отдельно от Zabbix на mon)
+  # --------------------------------------------------------------------------
+  prom = {
+    template_id = 101                # astra-template
+    ip_address  = "172.16.0.201/24"
+    memory      = 3072               # 3 GiB — Grafana + Prometheus + TSDB
+    disk_size   = 40                 # больше дефолта: TSDB Prometheus растёт
+    tags        = ["monitoring", "prometheus"]
+    # cores — дефолт (2)
+  }
 }
