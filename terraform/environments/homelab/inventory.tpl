@@ -18,6 +18,12 @@ all:
       hosts:
         mon:
           ansible_host: ${replace(vms["mon"].ip_address, "/24", "")}
+    
+    # Группа для развертывания Prometheus (сбор метрик с node_exporter)
+    prometheus_server:
+      hosts:
+        prom:
+          ansible_host: ${replace(vms["prom"].ip_address, "/24", "")}      
 
     # Виртуальный хост для работы с Zabbix API
     zabbix_api:
