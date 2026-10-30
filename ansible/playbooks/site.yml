@@ -12,7 +12,8 @@
     - common
     - docker
     - zabbix-agent
-
+    - node_exporter       # ← агент метрик на все VM (в стеке Prometheus)
+    
 # Блок 2: Zabbix Server на mon
 - name: Развернуть Zabbix на monitoring VM
   hosts: monitoring

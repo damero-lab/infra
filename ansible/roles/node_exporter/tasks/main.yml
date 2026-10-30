@@ -1,0 +1,118 @@
+# =============================================================================
+# Роль: node_exporter — установка нативно бинарником из GitHub-релиза
+#
+# Агент отдаёт метрики хоста по HTTP (порт 9100) для Prometheus.
+#
+# Порядок:
+#   1. Зависимости (curl, tar)
+#   2. Создать системного пользователя и группу
+#   3. Скачать тарбол релиза
+#   4. Распаковать во временный каталог
+#   5. Установить бинарь в /usr/local/bin
+#   6. Развернуть systemd-юнит
+#   7. Включить и запустить сервис
+#   8. UFW — открыть 9100 только для Prometheus
+# =============================================================================
+# -----------------------------------------------------------------------------
+# 1. Зависимости
+# -----------------------------------------------------------------------------
+- name: Установить зависимости (curl, tar)
+  ansible.builtin.apt:
+    name:
+      - curl
+      - tar
+    state: present
+    update_cache: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. Системный пользователь и группа
+# -----------------------------------------------------------------------------
+- name: Создать группу node_exporter
+  ansible.builtin.group:
+    name: "{{ node_exporter_group }}"
+    system: true
+  become: true
+
+- name: Создать пользователя node_exporter
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+  become: true
+
+# -----------------------------------------------------------------------------
+# 3. Скачать тарбол релиза
+# -----------------------------------------------------------------------------
+- name: Скачать архив node_exporter
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_download_url }}"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    mode: "0644"
+  become: true
+  register: node_exporter_download
+
+# -----------------------------------------------------------------------------
+# 4. Распаковать во временный каталог
+# -----------------------------------------------------------------------------
+- name: Распаковать архив node_exporter
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "{{ node_exporter_tmp_dir }}"
+  become: true
+
+# -----------------------------------------------------------------------------
+# 5. Установить бинарь в /usr/local/bin
+# -----------------------------------------------------------------------------
+- name: Установить бинарь node_exporter
+  ansible.builtin.copy:
+    src: "{{ node_exporter_tmp_dir }}/node_exporter"
+    dest: "{{ node_exporter_bin }}"
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: true
+  become: true
+  notify: restart node-exporter
+
+# -----------------------------------------------------------------------------
+# 6. Systemd-юнит
+# -----------------------------------------------------------------------------
+- name: Развернуть systemd-юнит node_exporter
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  notify: restart node-exporter
+
+# -----------------------------------------------------------------------------
+# 7. Включить и запустить сервис
+# -----------------------------------------------------------------------------
+- name: Включить и запустить node_exporter
+  ansible.builtin.systemd:
+    name: "{{ node_exporter_service }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 8. UFW — открыть порт 9100 только для Prometheus
+# -----------------------------------------------------------------------------
+- name: Разрешить Prometheus доступ к метрикам (порт 9100)
+  community.general.ufw:
+    rule: allow
+    port: "{{ node_exporter_port }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+    comment: "node_exporter — метрики для Prometheus"
+  loop: "{{ node_exporter_allowed_sources }}"
+  become: true
+  when: ufw_enabled | default(false)  
