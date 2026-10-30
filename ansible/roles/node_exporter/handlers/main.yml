@@ -1,0 +1,10 @@
+# =============================================================================
+# Handlers для роли node_exporter
+#
+# Перезапуск агента при изменении systemd-юнита.
+# =============================================================================
+- name: restart node-exporter
+  ansible.builtin.systemd:
+    name: "{{ node_exporter_service }}"
+    state: restarted
+  become: true
