@@ -1,0 +1,11 @@
+# =============================================================================
+# Handlers для роли prometheus
+#
+# Пересоздание контейнера при изменении конфигов (prometheus.yml / compose)
+# =============================================================================
+
+- name: restart prometheus stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ prometheus_stack_dir }}"
+  become: true
