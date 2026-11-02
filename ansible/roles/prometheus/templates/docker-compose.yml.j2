@@ -1,0 +1,25 @@
+# =============================================================================
+# Prometheus — Docker Compose
+#
+# Шаблон Jinja2. Ansible подставит переменные из defaults/main.yml.
+#
+# Сервис один — сам Prometheus. Конфиг и данные монтируются с хоста,
+# чтобы переживать пересоздание контейнера.
+# =============================================================================
+
+services:
+  prometheus:
+    image: {{ prometheus_image }}
+    container_name: prometheus
+    restart: always
+    # Образ работает от nobody (uid/gid 65534) — data-папка должна быть его
+    user: "65534:65534"
+    ports:
+      - "{{ prometheus_port }}:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./volumes/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time={{ prometheus_retention }}'

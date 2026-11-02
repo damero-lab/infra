@@ -1,0 +1,29 @@
+# =============================================================================
+# Конфигурация Prometheus (шаблон Jinja2)
+#
+# Taргеты node_exporter собираются ДИНАМИЧЕСКИ из инвентаря Ansible:
+# перебираем всех хостов группы astra и берём их ansible_host.
+# Новый хост в группе astra → автоматически попадает в мониторинг.
+# =============================================================================
+
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_scrape_interval }}
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Сам Prometheus — метрики о своём состоянии
+  # ---------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:{{ prometheus_port }}']
+
+  # ---------------------------------------------------------------------------
+  # node_exporter — системные метрики всех хостов группы astra
+  # ---------------------------------------------------------------------------
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets:
+{% for host in groups['astra'] %}
+          - '{{ hostvars[host].ansible_host }}:{{ prometheus_node_exporter_port }}'
+{% endfor %}
