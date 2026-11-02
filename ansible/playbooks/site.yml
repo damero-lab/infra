@@ -30,3 +30,12 @@
 
   roles:
     - zabbix-api
+
+# Блок 4: Prometheus на prom
+- name: Развернуть Prometheus на prometheus VM
+  hosts: prometheus_server
+  become: true
+  gather_facts: true
+
+  roles:
+    - prometheus    

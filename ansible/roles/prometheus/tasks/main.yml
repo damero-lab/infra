@@ -1,0 +1,103 @@
+# =============================================================================
+# Роль: prometheus — развёртывание Prometheus в Docker Compose
+#
+# Собирает метрики с node_exporter (:9100) со всех хостов группы astra.
+#
+# Порядок:
+#   1. Создать /opt/prometheus/
+#   2. Создать /opt/prometheus/volumes/data/ + выставить владельца 65534
+#   3. Скопировать prometheus.yml (из templates)
+#   4. Скопировать docker-compose.yml (из templates)
+#   5. Запустить docker compose up -d
+#   6. Открыть порт 9090 в UFW
+#   7. Дождаться готовности (/-/ready → HTTP 200)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Папки для стека
+# -----------------------------------------------------------------------------
+- name: Создать папку для Prometheus-стека
+  ansible.builtin.file:
+    path: "{{ prometheus_stack_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Создать папку для данных Prometheus (TSDB)
+  ansible.builtin.file:
+    path: "{{ prometheus_stack_dir }}/volumes/data"
+    state: directory
+    mode: "0755"
+  become: true
+
+# -----------------------------------------------------------------------------
+# 1a. Владелец data-папки — пользователь контейнера (nobody, uid/gid 65534)
+#     Образ prom/prometheus НЕ умеет chown'ить свой storage, в отличие от postgres.
+#     Без этого шага Prometheus упадёт с "permission denied" на /prometheus.
+# -----------------------------------------------------------------------------
+- name: Выставить владельца data-папки (65534:65534)
+  ansible.builtin.file:
+    path: "{{ prometheus_stack_dir }}/volumes/data"
+    state: directory
+    owner: "65534"
+    group: "65534"
+    recurse: true
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. prometheus.yml
+# -----------------------------------------------------------------------------
+- name: Скопировать prometheus.yml
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_stack_dir }}/prometheus.yml"
+    mode: "0644"
+  become: true
+  notify: restart prometheus stack
+
+# -----------------------------------------------------------------------------
+# 3. docker-compose.yml
+# -----------------------------------------------------------------------------
+- name: Скопировать docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ prometheus_stack_dir }}/docker-compose.yml"
+    mode: "0644"
+  become: true
+  notify: restart prometheus stack
+
+# -----------------------------------------------------------------------------
+# 4. Запуск стека
+# -----------------------------------------------------------------------------
+- name: Запустить Prometheus stack (docker compose up)
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ prometheus_stack_dir }}"
+  become: true
+  register: compose_up
+  changed_when: "'Started' in compose_up.stderr or 'Created' in compose_up.stderr or 'Recreated' in compose_up.stderr"
+
+# -----------------------------------------------------------------------------
+# 5. UFW — открыть порт
+# -----------------------------------------------------------------------------
+- name: Открыть порт Prometheus в UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ prometheus_port }}"
+    proto: tcp
+    comment: "Prometheus"
+  become: true
+  when: ufw_enabled | default(false)
+
+# -----------------------------------------------------------------------------
+# 6. Проверка готовности
+# -----------------------------------------------------------------------------
+- name: Подождать готовности Prometheus
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port }}/-/ready"
+    status_code: 200
+  register: prom_check
+  until: prom_check.status == 200
+  retries: 12
+  delay: 10
+  changed_when: false
