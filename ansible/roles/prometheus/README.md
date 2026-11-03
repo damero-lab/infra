@@ -30,18 +30,54 @@
 | `prometheus_retention` | `15d` | Срок хранения метрик |
 | `prometheus_node_exporter_port` | `9100` | Порт node_exporter на целевых хостах |
 
-## Taргеты для сбора
+## Таргеты для сбора
 
 Список таргетов **не хардкодится** — генерируется из инвентаря Ansible:
 
 ```jinja
 {% for host in groups['astra'] %}
-  - '{{ hostvars[host].ansible_host }}:{{ prometheus_node_exporter_port }}'
+- '{{ hostvars[host].ansible_host }}:{{ prometheus_node_exporter_port }}'
 {% endfor %}
 ```
 
 Значит, новая VM в группе `astra` → автоматически появляется в мониторинге
 после прогона плейбука. Отдельно править `prometheus.yml` не нужно.
+
+## UFW
+
+Роль открывает порт `9090` (веб UI и API Prometheus) для всех.
+
+Это осознанное решение для homelab: порт нужен для доступа к UI с рабочей
+машины. В проде — сузить до конкретных источников.
+
+## Self-scrape и docker-подсети (важно)
+
+Prometheus в контейнере скрейпит `node_exporter` **на всех хостах** группы
+`astra`, включая **свой собственный**.
+
+Возникает неочевидный эффект:
+
+- **Чужой хост** (`mon`, `app-01`) → пакет покидает `prom`, Docker делает
+  MASQUERADE → source подменяется на IP хоста (`172.16.0.201`).
+  Правило `allow from 172.16.0.201` на том хосте срабатывает. Всё хорошо.
+- **Свой хост** (`prom → prom`) → пакет не покидает машину, MASQUERADE
+  не срабатывает → source остаётся **docker-IP** контейнера (`172.18.0.2`).
+  Правило `172.16.0.201` его не пускает → drop → таймаут 10s.
+
+Поэтому роль `node_exporter` в `node_exporter_allowed_sources` разрешает
+не только IP Prometheus, но и **docker-подсети** (`172.17/18/19.0.0/16`).
+Тот же паттерн — в роли `zabbix-agent` (порт `10050`).
+
+Без этого целевой таргет Prometheus на самом `prom` будет `DOWN`
+с ошибкой `context deadline exceeded`.
+
+## Требования
+
+- Роль `docker` (Docker Engine + Compose v2)
+- Роль `common` (UFW + базовые пакеты)
+- Роль `node_exporter` на целевых хостах (иначе таргеты будут `DOWN`)
+- В `node_exporter_allowed_sources` должны быть docker-подсети
+  (для self-scrape — см. раздел выше)
 
 ## Использование
 
@@ -53,17 +89,13 @@
     - prometheus
 ```
 
-## Требования
-
-- Роль `docker` (Docker Engine + Compose v2)
-- Роль `common` (UFW + базовые пакеты)
-- Роль `node_exporter` на целевых хостах (иначе таргеты будут `DOWN`)
-
 ## После установки
 
 Веб-интерфейс: `http://172.16.0.201:9090`
 
-- Раздел **Status → Targets** — проверить, что все таргеты `UP`.
+Раздел **Status → Targets** — проверить, что все таргеты `UP`.
+Ожидаемо: N таргетов `node_exporter` (по числу хостов в `astra`)
++ 1 self-scrape (`localhost:9090`).
 
 ## Handlers
 
