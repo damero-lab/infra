@@ -19,7 +19,8 @@ terraform_*_linux_amd64.zip
 *.retry
 *.log
 .vault_pass
-ansible/inventories/homelab/hosts.yml   # <-- Сгенерированный файл, не коммитим
+# Сгенерированный файл, не коммитим
+ansible/inventories/homelab/hosts.yml
 
 # Secrets
 *.pem
