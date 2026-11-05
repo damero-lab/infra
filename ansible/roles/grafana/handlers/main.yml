@@ -1,0 +1,12 @@
+# =============================================================================
+# Handlers для роли grafana
+#
+# Пересоздание контейнера при изменении конфигов
+# (docker-compose.yml / provisioning / дашборды).
+# =============================================================================
+
+- name: restart grafana stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ grafana_stack_dir }}"
+  become: true

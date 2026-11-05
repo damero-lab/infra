@@ -1,0 +1,21 @@
+# =============================================================================
+# Provisioning: datasource Prometheus
+#
+# Grafana при старте сама подключит этот datasource — руками в UI настраивать
+# не нужно (нет config drift). Файл монтируется в
+# /etc/grafana/provisioning/datasources/.
+#
+# uid фиксирован ("prometheus"), чтобы дашборды могли ссылаться на него.
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # Адрес Prometheus (IP хоста из инвентаря, см. defaults/main.yml)
+    url: {{ grafana_prometheus_url }}
+    isDefault: true
+    editable: false
