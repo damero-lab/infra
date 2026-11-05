@@ -35,4 +35,8 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Внутренние документы (не публикуются в GitHub)
 PROJECT_CONTEXT.md
+ARCHITECTURE.md
+.clinerules
