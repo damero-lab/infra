@@ -38,4 +38,13 @@
   gather_facts: true
 
   roles:
-    - prometheus    
+    - prometheus
+
+# Блок 5: Grafana на prom (визуализация метрик из Prometheus)
+- name: Развернуть Grafana на prometheus VM
+  hosts: prometheus_server
+  become: true
+  gather_facts: true
+
+  roles:
+    - grafana
