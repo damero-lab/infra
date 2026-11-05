@@ -26,7 +26,7 @@ Prometheus (`node_exporter` `:9100`). Устанавливается на VM `pr
 | Переменная | По умолчанию | Описание |
 |---|---|---|
 | `grafana_stack_dir` | `/opt/grafana` | Папка для стека |
-| `grafana_version` | `11.4.0` | Версия Grafana |
+| `grafana_version` | `13.3.0` | Версия Grafana (пиннутый тег) |
 | `grafana_port` | `3000` | Порт веб-UI |
 | `grafana_admin_user` | `admin` | Логин администратора |
 | `grafana_prometheus_port` | `9090` | Порт Prometheus |
@@ -83,12 +83,15 @@ Datasource и дашборды описаны в коде и монтируют�
 
 ## Использование
 
+В `playbooks/site.yml` роль включена отдельным play (Блок 5):
+
 ```yaml
-# playbooks/site.yml
-- hosts: prometheus_server
+- name: Развернуть Grafana на prometheus VM
+  hosts: prometheus_server
   become: true
+  gather_facts: true
+
   roles:
-    - prometheus
     - grafana
 ```
 
@@ -99,6 +102,21 @@ Datasource и дашборды описаны в коде и монтируют�
 1. Войти под `admin` и паролем из Vault.
 2. **Connections → Data sources** — Prometheus должен быть в статусе OK (green).
 3. **Dashboards** — дашборд `Homelab Overview` уже загружен (provisioning).
+
+## ⚠️ Ротация пароля администратора
+
+`GF_SECURITY_ADMIN_PASSWORD` применяется **только при первом создании** пользователя,
+то есть когда БД в `./volumes/data` ещё пустая. После первого старта пароль хранится
+в БД, и простое изменение секрета в Vault + пересоздание контейнера пароль **не сменит**.
+
+Как сменить пароль после первого запуска:
+
+```bash
+cd /opt/grafana
+docker compose exec grafana grafana cli admin reset-admin-password 'НОВЫЙ_ПАРОЛЬ'
+```
+
+После смены — обновить значение в Ansible Vault, чтобы код и реальность совпадали.
 
 ## Handlers
 
