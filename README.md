@@ -21,6 +21,14 @@
 
 ## 🏗 Архитектура
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img alt="Схема архитектуры: инженер → GitHub Actions → mgmt → Proxmox VE → VM (mon, prom, app-01)" src="docs/images/architecture-light.svg" width="100%">
+</picture>
+
+<details>
+<summary>Исходник схемы (Mermaid)</summary>
+
 ```mermaid
 flowchart TD
     ENG["👤 Инженер<br/>ПК или телефон"]
@@ -41,25 +49,23 @@ flowchart TD
     RUN -->|"ansible-playbook site.yml"| VMS
 ```
 
+</details>
+
 ### Компоненты
 
-| Компонент | Роль | Адрес |
-|---|---|---|
-| **Proxmox VE** | Гипервизор, где создаются VM (шаблон `astra-template`, ID `101`) | `172.16.0.199` |
-| **mgmt** (Debian) | Управляющая машина: state Terraform, self-hosted GitHub Runner, запуск Ansible. SSH-bastion | `172.16.0.248` |
-| **mon** (Astra Linux 1.8) | Хост мониторинга: Zabbix Server + Web + PostgreSQL (Docker) + Zabbix Agent | `172.16.0.200` |
-| **prom** (Astra Linux 1.8) | Prometheus + node_exporter + **Grafana** (Docker Compose) | `172.16.0.201` |
-| **app-01** (Astra Linux 1.8) | Тестовая VM: Zabbix Agent + node_exporter | `172.16.0.211` |
+- **Proxmox VE** · `172.16.0.199` — гипервизор, где создаются VM (шаблон `astra-template`, ID `101`).
+- **mgmt** (Debian) · `172.16.0.248` — управляющая машина: state Terraform, self-hosted GitHub Runner, запуск Ansible. SSH-bastion.
+- **mon** (Astra Linux 1.8) · `172.16.0.200` — Zabbix Server + Web + PostgreSQL (Docker) + Zabbix Agent.
+- **prom** (Astra Linux 1.8) · `172.16.0.201` — Prometheus + node_exporter + Grafana (Docker Compose).
+- **app-01** (Astra Linux 1.8) · `172.16.0.211` — тестовая VM: Zabbix Agent + node_exporter.
 
 ---
 
 ## 🧠 Как это работает
 
-| Слой | Инструмент | Задача |
-|---|---|---|
-| **Провижининг VM** | **Terraform** (`bpg/proxmox`) | Клонирует шаблон `101`, настраивает сеть через cloud-init, генерирует инвентарь Ansible |
-| **Конфигурация** | **Ansible** | Hardening + UFW, Docker, Zabbix, node_exporter, Prometheus, Grafana |
-| **Оркестрация** | **GitHub Actions** | Ручной запуск из GitHub UI, выполняется на self-hosted runner (`mgmt`) |
+- **Провижининг VM** — **Terraform** (`bpg/proxmox`): клонирует шаблон `101`, настраивает сеть через cloud-init, генерирует инвентарь Ansible.
+- **Конфигурация** — **Ansible**: hardening + UFW, Docker, Zabbix, node_exporter, Prometheus, Grafana.
+- **Оркестрация** — **GitHub Actions**: ручной запуск из GitHub UI, выполняется на self-hosted runner (`mgmt`).
 
 **Единый источник правды — `terraform/environments/homelab/vms.auto.tfvars`.** Добавить хост =
 добавить запись в реестр; инвентарь Ansible (`hosts.yml`) пересобирается сам и в Git не хранится
@@ -75,6 +81,14 @@ flowchart TD
 Стенд намеренно демонстрирует **обе классические модели сбора метрик** — один и тот же хост
 отдаёт данные сразу двум системам.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/monitoring-dark.svg">
+  <img alt="Две модели мониторинга: zabbix-agent (push) → Zabbix Server на mon; node_exporter (pull) → Prometheus → Grafana на prom" src="docs/images/monitoring-light.svg" width="100%">
+</picture>
+
+<details>
+<summary>Исходник схемы (Mermaid)</summary>
+
 ```mermaid
 flowchart TD
     subgraph HOSTS["📦 Хосты (группа astra): mon · prom · app-01"]
@@ -88,12 +102,17 @@ flowchart TD
     PR -->|"datasource as code"| GR["📈 Grafana · prom<br/>:3000"]
 ```
 
-| | **Zabbix** (push) | **Prometheus + Grafana** (pull) |
-|---|---|---|
-| Как собирает | Агент сам отправляет метрики на сервер | Сервер сам опрашивает `node_exporter` |
-| Агент на хостах | `zabbix-agent` (`:10050`) | `node_exporter` (`:9100`) |
-| Сервер | `mon` (`:8080`) | `prom` (`:9090`) |
-| Визуализация | Zabbix Web UI | Grafana (`:3000`), provisioning-as-code |
+</details>
+
+**🔵 Zabbix — push-модель**
+
+- Агент `zabbix-agent` (`:10050`) сам отправляет метрики на сервер.
+- Сервер — `mon` (`http://172.16.0.200:8080`); визуализация — Zabbix Web UI.
+
+**🟠 Prometheus + Grafana — pull-модель**
+
+- Сервер сам опрашивает `node_exporter` (`:9100`) на хостах.
+- Сервер — `prom` (`http://172.16.0.201:9090`); визуализация — Grafana (`:3000`), datasource и дашборд подключаются как код (provisioning).
 
 **Grafana** стоит поверх Prometheus: datasource и дашборд `Homelab Overview` подключаются
 **как код** (provisioning) — вручную в UI ничего не настраивается (иначе *config drift*).
@@ -143,11 +162,9 @@ ansible-playbook playbooks/site.yml
 
 ## ✅ Как проверить
 
-| Сервис | Адрес | Что смотреть |
-|---|---|---|
-| **Zabbix Web** | `http://172.16.0.200:8080` | *Data collection → Hosts* — список хостов; *Monitoring → Latest data* — метрики идут |
-| **Prometheus** | `http://172.16.0.201:9090` | *Status → Targets* — таргеты `node_exporter` в статусе **UP** |
-| **Grafana** | `http://172.16.0.201:3000` | Дашборд **Homelab Overview**; *Connections → Data sources* — Prometheus **OK** |
+- **Zabbix Web** — `http://172.16.0.200:8080`: *Data collection → Hosts* (список хостов), *Monitoring → Latest data* (метрики идут).
+- **Prometheus** — `http://172.16.0.201:9090`: *Status → Targets* — таргеты `node_exporter` в статусе **UP**.
+- **Grafana** — `http://172.16.0.201:3000`: дашборд **Homelab Overview**; *Connections → Data sources* — Prometheus **OK**.
 
 Пароли — из Ansible Vault (`admin` для Zabbix Web и Grafana). Быстрая проверка Grafana из CLI:
 
@@ -172,7 +189,7 @@ infra/
 │                             # zabbix-api, node_exporter, prometheus, grafana
 ├── docs/
 │   ├── bootstrap-astra-template.md  # сборка шаблона Astra Linux для Proxmox
-│   └── images/               # скриншоты для документации
+│   └── images/               # скриншоты + SVG-схемы (light/dark)
 └── terraform/
     ├── environments/homelab/ # окружение: vms.auto.tfvars, main.tf, inventory.tpl
     └── modules/vm/           # переиспользуемый модуль VM (клон шаблона + cloud-init)
@@ -201,6 +218,7 @@ infra/
 - Перейти с `local` backend на **remote** с state locking (параллельные `apply` сейчас опасны).
 - Добавить **PR-валидацию в CI**: `terraform plan`, `ansible-lint`, `--syntax-check` на `pull_request`.
 - Автоматизировать **ротацию пароля Grafana** (смена секрета в Vault не меняет пароль в БД).
+- Перегенерировать SVG-схемы (`docs/images/*.svg`, light/dark) при изменении Mermaid-исходника.
 
 ---
 
