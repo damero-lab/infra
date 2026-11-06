@@ -21,10 +21,12 @@
 
 ## 🏗 Архитектура
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
-  <img alt="Схема архитектуры: инженер → GitHub Actions → mgmt → Proxmox VE → VM (mon, prom, app-01)" src="docs/images/architecture-light.svg" width="100%">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+    <img alt="Схема архитектуры: инженер → GitHub Actions → mgmt → Proxmox VE → VM (mon, prom, app-01)" src="docs/images/architecture-light.svg" width="480">
+  </picture>
+</p>
 
 <details>
 <summary>Исходник схемы (Mermaid)</summary>
@@ -81,10 +83,12 @@ flowchart TD
 Стенд намеренно демонстрирует **обе классические модели сбора метрик** — один и тот же хост
 отдаёт данные сразу двум системам.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/monitoring-dark.svg">
-  <img alt="Две модели мониторинга: zabbix-agent (push) → Zabbix Server на mon; node_exporter (pull) → Prometheus → Grafana на prom" src="docs/images/monitoring-light.svg" width="100%">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/monitoring-dark.svg">
+    <img alt="Две модели мониторинга: zabbix-agent (push) → Zabbix Server на mon; node_exporter (pull) → Prometheus → Grafana на prom" src="docs/images/monitoring-light.svg" width="480">
+  </picture>
+</p>
 
 <details>
 <summary>Исходник схемы (Mermaid)</summary>
@@ -92,13 +96,13 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph HOSTS["📦 Хосты (группа astra): mon · prom · app-01"]
-        direction TB
+        direction LR
         ZA["zabbix-agent<br/>push → :10050"]
         NE["node_exporter<br/>pull → :9100"]
     end
 
-    ZA -->|"агент сам отправляет"| ZS["🔵 Zabbix Server · mon<br/>172.16.0.200 · :8080"]
-    NE -->|"сервер сам опрашивает"| PR["🟠 Prometheus · prom<br/>172.16.0.201 · :9090"]
+    HOSTS -->|"агент сам отправляет"| ZS["🔵 Zabbix Server · mon<br/>172.16.0.200 · :8080"]
+    HOSTS -->|"сервер сам опрашивает"| PR["🟠 Prometheus · prom<br/>172.16.0.201 · :9090"]
     PR -->|"datasource as code"| GR["📈 Grafana · prom<br/>:3000"]
 ```
 
