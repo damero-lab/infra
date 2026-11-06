@@ -1,0 +1,22 @@
+# =============================================================================
+# Provisioning: провайдер дашбордов
+#
+# Указывает Grafana, откуда читать JSON-дашборды. Папка /var/lib/grafana/dashboards
+# смонтирована с хоста (./dashboards) — все .json из неё автоматически
+# загружаются при старте и обновляются каждые 30 секунд.
+#
+# allowUiUpdates: false — правки в UI не сохраняются: источник правды только код.
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: homelab
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

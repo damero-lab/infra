@@ -1,0 +1,149 @@
+# =============================================================================
+# Роль: grafana — развёртывание Grafana в Docker Compose
+#
+# Визуализирует метрики из Prometheus. Datasource и дашборды подключаются
+# через provisioning (как код) — вручную в UI ничего не настраиваем.
+#
+# Порядок:
+#   1. Создать /opt/grafana/ + volumes/data + provisioning/{datasources,dashboards}
+#   2. Выставить владельца data-папки (472:472 — пользователь контейнера)
+#   3. Скопировать provisioning (datasource Prometheus, провайдер дашбордов)
+#   4. Скопировать дашборды (files/dashboards)
+#   5. Скопировать docker-compose.yml
+#   6. Запустить docker compose up -d
+#   7. Открыть порт 3000 в UFW
+#   8. Применить handlers (пересоздать контейнер, если конфиг изменился)
+#   9. Дождаться готовности (/api/health → HTTP 200)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Папки для стека
+# -----------------------------------------------------------------------------
+- name: Создать папку для Grafana-стека
+  ansible.builtin.file:
+    path: "{{ grafana_stack_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Создать папку для данных Grafana
+  ansible.builtin.file:
+    path: "{{ grafana_stack_dir }}/volumes/data"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Создать папки provisioning и дашбордов
+  ansible.builtin.file:
+    path: "{{ grafana_stack_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - provisioning/datasources
+    - provisioning/dashboards
+    - dashboards
+  become: true
+
+# -----------------------------------------------------------------------------
+# 1a. Владелец data-папки — пользователь контейнера Grafana (uid/gid 472).
+#     Без этого Grafana упадёт с "permission denied" на /var/lib/grafana.
+#     ВАЖНО: НЕ используем recurse — Grafana сама создаёт файлы внутри
+#     (grafana.db 0640, подпапки 0700). Рекурсивный chmod 0755 расшарил бы БД
+#     на чтение всем и давал бы "changed" на каждом прогоне (не-идемпотентность).
+# -----------------------------------------------------------------------------
+- name: Выставить владельца data-папки (472:472, без recurse)
+  ansible.builtin.file:
+    path: "{{ grafana_stack_dir }}/volumes/data"
+    state: directory
+    owner: "{{ grafana_uid }}"
+    group: "{{ grafana_gid }}"
+    mode: "0755"
+  become: true
+
+# -----------------------------------------------------------------------------
+# 2. Provisioning: datasource + провайдер дашбордов
+# -----------------------------------------------------------------------------
+- name: Скопировать provisioning datasource (Prometheus)
+  ansible.builtin.template:
+    src: provisioning/datasources/prometheus.yml.j2
+    dest: "{{ grafana_stack_dir }}/provisioning/datasources/prometheus.yml"
+    mode: "0644"
+  become: true
+  notify: restart grafana stack
+
+- name: Скопировать provisioning провайдера дашбордов
+  ansible.builtin.template:
+    src: provisioning/dashboards/provider.yml.j2
+    dest: "{{ grafana_stack_dir }}/provisioning/dashboards/provider.yml"
+    mode: "0644"
+  become: true
+  notify: restart grafana stack
+
+# -----------------------------------------------------------------------------
+# 3. Дашборды (JSON как код)
+# -----------------------------------------------------------------------------
+- name: Скопировать дашборды (JSON)
+  ansible.builtin.copy:
+    src: dashboards/
+    dest: "{{ grafana_stack_dir }}/dashboards/"
+    mode: "0644"
+    owner: "{{ grafana_uid }}"
+    group: "{{ grafana_gid }}"
+  become: true
+  notify: restart grafana stack
+
+# -----------------------------------------------------------------------------
+# 4. docker-compose.yml
+# -----------------------------------------------------------------------------
+- name: Скопировать docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ grafana_stack_dir }}/docker-compose.yml"
+    mode: "0644"
+  become: true
+  notify: restart grafana stack
+
+# -----------------------------------------------------------------------------
+# 5. Запуск стека
+# -----------------------------------------------------------------------------
+- name: Запустить Grafana stack (docker compose up)
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ grafana_stack_dir }}"
+  become: true
+  register: compose_up
+  changed_when: "'Started' in compose_up.stderr or 'Created' in compose_up.stderr or 'Recreated' in compose_up.stderr"
+
+# -----------------------------------------------------------------------------
+# 6. UFW — открыть порт
+# -----------------------------------------------------------------------------
+- name: Открыть порт Grafana в UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ grafana_port }}"
+    proto: tcp
+    comment: "Grafana"
+  become: true
+  when: ufw_enabled | default(false)
+
+# -----------------------------------------------------------------------------
+# 7. Применить отложенные handlers ДО health-check.
+#    Handlers в Ansible выполняются в конце play, поэтому без flush_handlers
+#    health-check проверил бы ещё старый контейнер, а пересоздание случилось бы
+#    уже после проверки. flush_handlers гарантирует: конфиг применён → проверяем.
+# -----------------------------------------------------------------------------
+- name: Применить отложенные handlers перед health-check
+  ansible.builtin.meta: flush_handlers
+
+# -----------------------------------------------------------------------------
+# 8. Проверка готовности
+# -----------------------------------------------------------------------------
+- name: Подождать готовности Grafana
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/health"
+    status_code: 200
+  register: grafana_check
+  until: grafana_check.status == 200
+  retries: 12
+  delay: 10
+  changed_when: false

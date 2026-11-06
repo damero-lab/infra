@@ -1,0 +1,30 @@
+# =============================================================================
+# Grafana — Docker Compose
+#
+# Шаблон Jinja2. Ansible подставит переменные из defaults/main.yml.
+#
+# Конфиг (provisioning) и данные (volumes/data) монтируются с хоста,
+# чтобы переживать пересоздание контейнера.
+# =============================================================================
+
+services:
+  grafana:
+    image: {{ grafana_image }}
+    container_name: grafana
+    restart: always
+    # Образ grafana работает от пользователя grafana (uid/gid 472).
+    # Владелец ./volumes/data выставлен этому пользователю в tasks/main.yml.
+    user: "{{ grafana_uid }}:{{ grafana_gid }}"
+    ports:
+      - "{{ grafana_port }}:3000"
+    environment:
+      # Логин — не секрет. Пароль берём из Ansible Vault (не хардкодим!).
+      GF_SECURITY_ADMIN_USER: "{{ grafana_admin_user }}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{ vault_grafana_admin_password }}"
+    volumes:
+      # Данные Grafana (БД, плагины) — переживают пересоздание контейнера
+      - ./volumes/data:/var/lib/grafana
+      # Provisioning as code: datasource + провайдер дашбордов
+      - ./provisioning:/etc/grafana/provisioning:ro
+      # JSON-дашборды, которые читает провайдер
+      - ./dashboards:/var/lib/grafana/dashboards:ro
