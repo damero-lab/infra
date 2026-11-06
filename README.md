@@ -95,15 +95,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    subgraph HOSTS["📦 Хосты (группа astra): mon · prom · app-01"]
-        direction LR
-        ZA["zabbix-agent<br/>push → :10050"]
-        NE["node_exporter<br/>pull → :9100"]
-    end
-
-    HOSTS -->|"агент сам отправляет"| ZS["🔵 Zabbix Server · mon<br/>172.16.0.200 · :8080"]
-    HOSTS -->|"сервер сам опрашивает"| PR["🟠 Prometheus · prom<br/>172.16.0.201 · :9090"]
-    PR -->|"datasource as code"| GR["📈 Grafana · prom<br/>:3000"]
+    ZA["📦 zabbix-agent<br/>push · :10050"] -->|"push"| ZS["🔵 Zabbix Server · mon<br/>172.16.0.200 · :8080"]
+    NE["📦 node_exporter<br/>pull · :9100"] -->|"pull"| PR["🟠 Prometheus · prom<br/>172.16.0.201 · :9090"]
+    PR -->|"datasource"| GR["📈 Grafana · prom · :3000"]
 ```
 
 </details>
