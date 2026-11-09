@@ -190,7 +190,7 @@ infra/
 │   └── images/               # скриншоты + SVG-схемы (light/dark)
 └── terraform/
     ├── environments/homelab/ # окружение: vms.auto.tfvars, main.tf, inventory.tpl
-    └── modules/vm/           # переиспользуемый модуль VM (клон шаблона + cloud-init)
+    └── modules/vm/           # переиспользуемый модуль VM (клон шаблона, cloud-init, resize диска)
 ```
 
 ---
@@ -212,7 +212,6 @@ infra/
 
 ## 🗺 Roadmap / известные ограничения
 
-- Применить `disk_size` / `disk_storage` в модуле `vm` (сейчас диск наследуется от шаблона).
 - Перейти с `local` backend на **remote** с state locking (параллельные `apply` сейчас опасны).
 - Добавить **PR-валидацию в CI**: `terraform plan`, `ansible-lint`, `--syntax-check` на `pull_request`.
 - Автоматизировать **ротацию пароля Grafana** (смена секрета в Vault не меняет пароль в БД).
