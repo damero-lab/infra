@@ -20,8 +20,10 @@ variable "vms" {
     ip_address  = string
     cores       = optional(number, 2)
     memory      = optional(number, 2048)
-    disk_size   = optional(number, 20)
-    tags        = optional(list(string), [])
+    # disk_size = null → диск наследуется от шаблона; задавать для УВЕЛИЧЕНИЯ
+    disk_size    = optional(number)
+    disk_storage = optional(string, "local-lvm")
+    tags         = optional(list(string), [])
   }))
   default = {}
 }
@@ -49,9 +51,12 @@ module "vms" {
   gateway    = var.network_gateway
 
   # Ресурсы — из реестра (со значениями по умолчанию из type)
-  cores     = each.value.cores
-  memory    = each.value.memory
-  disk_size = each.value.disk_size
+  cores  = each.value.cores
+  memory = each.value.memory
+
+  # Диск: disk_size = null → наследуем от шаблона; задан → увеличиваем
+  disk_size    = each.value.disk_size
+  disk_storage = each.value.disk_storage
 
   # Теги — из реестра
   tags = each.value.tags
