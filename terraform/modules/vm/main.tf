@@ -18,8 +18,27 @@ resource "proxmox_virtual_environment_vm" "this" {
     full  = true  # Полный клон (не linked) — независимый диск
   }
 
-  # Отключаем создание диска — он будет унаследован от шаблона
-  # (Proxmox сам разберётся с клонированием)
+  # Диск: переопределяем ТОЛЬКО если disk_size задан явно (opt-in).
+  # Если disk_size = null — блока нет, диск наследуется от шаблона (как раньше).
+  #
+  # ⚠️ Почему dynamic, а не статичный disk:
+  #   При клоне провайдер применяет ДЕФОЛТЫ СХЕМЫ к любым неуказанным атрибутам
+  #   диска (size=8, discard=ignore, ssd=false, iothread=false), перезаписывая
+  #   настройки шаблона. Поэтому, задавая size, мы обязаны продублировать
+  #   остальные атрибуты шаблона (discard/ssd/iothread), иначе получим регресс.
+  #   А если бы мы всегда включали блок с size=20 — Terraform пытался бы
+  #   СЖАТЬ диск с 32 GiB (Proxmox умеет только увеличивать).
+  dynamic "disk" {
+    for_each = var.disk_size == null ? [] : [1]
+    content {
+      interface    = var.disk_interface
+      datastore_id = var.disk_storage
+      size         = var.disk_size
+      discard      = var.disk_discard
+      ssd          = var.disk_ssd
+      iothread     = var.disk_iothread
+    }
+  }
 
   # CPU
   cpu {

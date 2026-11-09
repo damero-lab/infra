@@ -50,15 +50,42 @@ variable "memory" {
 }
 
 variable "disk_size" {
-  description = "Размер диска в гигабайтах"
+  description = <<-EOT
+    Размер диска в гигабайтах (GiB). По умолчанию null — диск наследуется от
+    шаблона. Задавайте явно ТОЛЬКО для УВЕЛИЧЕНИЯ (Proxmox не умеет уменьшать).
+  EOT
   type        = number
-  default     = 20
+  default     = null
 }
 
 variable "disk_storage" {
-  description = "Хранилище, где размещается диск VM"
+  description = "Хранилище (datastore), где размещается диск VM"
   type        = string
   default     = "local-lvm"
+}
+
+variable "disk_interface" {
+  description = "Интерфейс диска в Proxmox (должен совпадать с шаблоном): sata0, scsi0, virtio0…"
+  type        = string
+  default     = "sata0"
+}
+
+variable "disk_discard" {
+  description = "Проброс discard/trim на хранилище: on | ignore (в шаблоне astra — on)"
+  type        = string
+  default     = "on"
+}
+
+variable "disk_ssd" {
+  description = "Эмуляция SSD для диска (в шаблоне astra — включена)"
+  type        = bool
+  default     = true
+}
+
+variable "disk_iothread" {
+  description = "Отдельный I/O-поток для диска (в шаблоне astra — включён)"
+  type        = bool
+  default     = true
 }
 
 variable "network_bridge" {
