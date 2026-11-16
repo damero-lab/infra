@@ -110,3 +110,21 @@ variable "tags" {
   type        = list(string)
   default     = []
 }
+
+variable "cloud_init_upgrade" {
+  description = <<-EOT
+    Разрешить cloud-init делать автоматический dist-upgrade при первом старте VM
+    (Proxmox-флаг `ciupgrade`).
+
+    По умолчанию false, потому что первый boot иначе запускает ПОЛНЫЙ dist-upgrade:
+    он держит блокировку dpkg десятки минут, а если апгрейд задевает сам пакет
+    cloud-init — его postinst перезапускает cloud-init.target и ждёт остановки
+    собственного процесса (deadlock). cloud-init не завершается никогда, dpkg-лок
+    не освобождается, и Ansible падает на задачах apt:
+      "Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend)".
+
+    Пакетами на VM управляет Ansible/CI, а не cloud-init.
+  EOT
+  type        = bool
+  default     = false
+}
