@@ -77,6 +77,15 @@ resource "proxmox_virtual_environment_vm" "this" {
       username = var.ansible_user
       keys     = [var.ssh_public_key]
     }
+
+    # Автоматический dist-upgrade при первом старте (Proxmox `ciupgrade`).
+    # По умолчанию ОТКЛЮЧАЕМ: иначе cloud-init на первом boot делает полный
+    # dist-upgrade, который держит блокировку dpkg и — если апгрейд задевает сам
+    # пакет cloud-init — навсегда зависает (postinst перезапускает cloud-init.target
+    # и ждёт сам себя). Ansible после этого не может ставить пакеты:
+    # "Unable to acquire the dpkg frontend lock". Пакетами управляет Ansible,
+    # а не cloud-init. См. переменную cloud_init_upgrade.
+    upgrade = var.cloud_init_upgrade
   }
 
   # Включаем VM после создания

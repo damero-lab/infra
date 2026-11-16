@@ -50,3 +50,28 @@ module "app_01" {
 > настройки шаблона. Поэтому блок включается только при заданном `disk_size`, а остальные
 > атрибуты дублируются явно (иначе — регресс). Иначе (`size=20` по умолчанию) Terraform
 > пытался бы **сжать** диск с 32 GiB — Proxmox так не умеет.
+
+## cloud-init: автоматический апгрейд (`cloud_init_upgrade`)
+
+| Переменная | По умолчанию | Назначение |
+|---|---|---|
+| `cloud_init_upgrade` | `false` | Разрешить cloud-init делать `dist-upgrade` при первом старте (Proxmox-флаг `ciupgrade`) |
+
+Держим **выключенным** (`false`). Если оставить `true`, cloud-init на первом boot
+запускает **полный `dist-upgrade`**: он держит блокировку dpkg десятки минут, а если
+апгрейд задевает сам пакет `cloud-init` — его `postinst` перезапускает `cloud-init.target`
+и ждёт остановки собственного процесса (**deadlock**). cloud-init не завершается никогда,
+`/var/lib/dpkg/lock-frontend` не освобождается, и Ansible падает на задачах `apt`:
+
+```
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend),
+is another process using it?
+```
+
+Пакетами на VM управляет **Ansible/CI**, а не cloud-init. Отдельный «долгий апгрейд» —
+задача пайплайна, а не сюрприз при первом старте.
+
+> ⚠️ **Оговорка Proxmox:** аргумент `initialization.upgrade` (флаг `ciupgrade`) сервер
+> принимает только от пользователя **`root@pam`**. При аутентификации по API-токену
+> `terraform apply` может вернуть `only allowed for root@pam`. В этом случае отключите
+> апгрейд на шаблоне: `qm set 101 --ciupgrade 0` (клоны наследуют значение).
