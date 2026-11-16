@@ -51,17 +51,22 @@
       when: cloud_init_bin.stat.exists
 
     # Подстраховка: если блокировку держит не cloud-init, а unattended-upgrades
-    # или apt-daily. fuser возвращает 0, пока файл занят процессом; 1 — свободен.
-    # Если fuser не установлен (rc=127) — ждать нечего, цикл завершится сразу.
-    # 60 попыток × 5 c = до 5 минут ожидания; затем задача честно упадёт.
+    # или apt-daily. Ждём до 5 минут, затем задача честно падает.
+    #
+    # Почему shell-цикл, а не `command` + `until`: `fuser` возвращает НЕнулевой rc,
+    # когда блокировка СВОБОДНА (это признак успеха), но модуль `command` считает
+    # ненулевой rc ошибкой задачи, а `until` управляет лишь повторами — итог всё
+    # равно FAILED. Цикл ниже делает проверку явной: лок свободен → exit 0.
     - name: Ждать освобождения блокировки dpkg
-      ansible.builtin.command: fuser /var/lib/dpkg/lock-frontend
-      register: dpkg_lock
+      ansible.builtin.shell: |
+        for _ in $(seq 1 60); do
+          fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || exit 0
+          sleep 5
+        done
+        echo "dpkg lock still held after 300s" >&2
+        exit 1
       changed_when: false
       become: true
-      retries: 60
-      delay: 5
-      until: dpkg_lock.rc != 0
 
 # Блок 1: Базовая настройка всех VM
 - name: Базовая настройка всех VM
