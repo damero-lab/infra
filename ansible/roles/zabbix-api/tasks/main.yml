@@ -51,14 +51,14 @@
         password: "{{ vault_zabbix_admin_password }}"
       id: 1
     status_code: 200
-  register: zabbix_auth
+  register: zabbix_auth_vault
   changed_when: false
 
 # -----------------------------------------------------------------------------
 # 3. Bootstrap пароля Admin на свежей БД (пароль из Vault ещё не подходит)
 # -----------------------------------------------------------------------------
 - name: Bootstrap пароля администратора Zabbix
-  when: (zabbix_auth.json.result | default('')) | length == 0
+  when: (zabbix_auth_vault.json.result | default('')) | length == 0
   block:
     - name: Войти дефолтным паролем образа Zabbix
       ansible.builtin.uri:
@@ -133,12 +133,27 @@
             password: "{{ vault_zabbix_admin_password }}"
           id: 5
         status_code: 200
-      register: zabbix_auth
+      register: zabbix_auth_relogin
       changed_when: false
+
+# -----------------------------------------------------------------------------
+# 4. Токен сессии — в одну переменную.
+#
+# ВАЖНО: регистры внутри блока нельзя переиспользовать снаружи. Если блок
+# пропущен (пароль из Vault сразу подошёл), его внутренние register-переменные
+# всё равно получат результат "skipped" и ЗАТРУТ прежнее значение — поэтому
+# токен собираем явно в zabbix_token.
+# -----------------------------------------------------------------------------
+- name: Зафиксировать токен сессии Zabbix
+  ansible.builtin.set_fact:
+    zabbix_token: >-
+      {{ zabbix_auth_vault.json.result
+         if (zabbix_auth_vault.json.result | default('')) | length > 0
+         else (zabbix_auth_relogin.json.result | default('')) }}
 
 - name: Проверить, что авторизация в Zabbix API прошла
   ansible.builtin.assert:
-    that: (zabbix_auth.json.result | default('')) | length > 0
+    that: zabbix_token | length > 0
     success_msg: "Zabbix API: авторизация OK"
     fail_msg: >-
       Не удалось авторизоваться в Zabbix API: ни паролем из Vault, ни дефолтным
@@ -150,7 +165,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "hostgroup.get"
@@ -167,7 +182,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "template.get"
@@ -184,7 +199,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "host.get"
@@ -206,7 +221,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "host.update"
@@ -230,7 +245,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "host.create"
