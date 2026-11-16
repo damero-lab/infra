@@ -11,19 +11,57 @@
 #     "ssh: connect to host <IP> port 22: Connection refused"  (sshd ещё не слушает)
 #     "ssh: connect to host <IP> port 22: Connection timed out" (VM ещё грузится)
 #
-# wait_for_connection идемпотентно ждёт восстановления SSH-сессии (ретраи + пауза).
+# Готовность идёт в ДВЕ стадии, и обе надо переждать:
+#   1) SSH поднялся (sshd слушает порт 22);
+#   2) cloud-init завершил первый запуск и отпустил блокировку dpkg.
+#      Иначе SSH уже есть, но задачи apt падают с:
+#        "Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend),
+#         is another process using it?"
+#      (ssh-порт открыт, а cloud-init ещё ставит пакеты и держит блокировку).
+#
 # Ожидание — ответственность Ansible (конфигурация), а не Terraform (провижининг).
-- name: Ожидание готовности VM по SSH
+- name: Ожидание готовности VM (SSH + cloud-init)
   hosts: astra            # mon, prom, app-01 — все целевые VM в этой группе
   gather_facts: false     # факты соберёт следующий play, уже по живому SSH
 
   tasks:
+    # --- Стадия 1: SSH -------------------------------------------------------
     - name: Ждать, пока поднимется SSH на VM
       ansible.builtin.wait_for_connection:
         delay: 5            # первая попытка через 5 c после старта play
         timeout: 600        # ждать до 10 мин (холодный старт Astra + cloud-init)
         sleep: 5            # пауза между попытками
         connect_timeout: 5  # таймаут одной попытки подключения
+
+    # --- Стадия 2: cloud-init и блокировка dpkg ------------------------------
+    - name: Проверить, установлен ли cloud-init
+      ansible.builtin.stat:
+        path: /usr/bin/cloud-init
+      register: cloud_init_bin
+
+    # `cloud-init status --wait` блокируется до завершения первого запуска VM.
+    # Статус degraded-done (для облачных образов Astra это норма) отдаёт
+    # ненулевой код, но настройку не ломает — поэтому не считаем это ошибкой.
+    # timeout в 10 мин — страховка, чтобы не зависнуть на «зависшем» cloud-init.
+    - name: Ждать завершения cloud-init
+      ansible.builtin.command: timeout 600 cloud-init status --wait
+      register: cloud_init_status
+      changed_when: false
+      failed_when: false
+      when: cloud_init_bin.stat.exists
+
+    # Подстраховка: если блокировку держит не cloud-init, а unattended-upgrades
+    # или apt-daily. fuser возвращает 0, пока файл занят процессом; 1 — свободен.
+    # Если fuser не установлен (rc=127) — ждать нечего, цикл завершится сразу.
+    # 60 попыток × 5 c = до 5 минут ожидания; затем задача честно упадёт.
+    - name: Ждать освобождения блокировки dpkg
+      ansible.builtin.command: fuser /var/lib/dpkg/lock-frontend
+      register: dpkg_lock
+      changed_when: false
+      become: true
+      retries: 60
+      delay: 5
+      until: dpkg_lock.rc != 0
 
 # Блок 1: Базовая настройка всех VM
 - name: Базовая настройка всех VM
