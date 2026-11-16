@@ -96,6 +96,7 @@
         status_code: 200
       register: zabbix_admin_info
       changed_when: false
+      failed_when: (zabbix_admin_info.json.result | default([])) | length == 0
 
     - name: Сменить пароль Admin на пароль из Vault
       ansible.builtin.uri:
@@ -109,10 +110,15 @@
           method: "user.update"
           params:
             userid: "{{ zabbix_admin_info.json.result[0].userid }}"
+            # Zabbix требует ТЕКУЩИЙ пароль при смене собственного пароля,
+            # иначе: "Invalid params: Current password is mandatory."
+            current_passwd: "{{ zabbix_api_default_admin_password }}"
             passwd: "{{ vault_zabbix_admin_password }}"
           id: 4
         status_code: 200
-      changed_when: true
+      register: zabbix_password_update
+      changed_when: zabbix_password_update.json.result is defined
+      failed_when: zabbix_password_update.json.error is defined
 
     - name: Повторный вход уже паролем из Vault
       ansible.builtin.uri:
