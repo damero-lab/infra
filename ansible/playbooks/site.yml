@@ -2,6 +2,29 @@
 # Главный playbook homelab
 # =============================================================================
 
+# Блок 0: Ожидание готовности VM.
+#
+# Зачем: `terraform apply` завершается, как только Proxmox отчитался, что VM
+# СОЗДАНЫ и started=true. Это «процесс запущен», а НЕ «ОС загрузилась». Astra
+# Linux + cloud-init + sshd поднимаются десятки секунд — минуты, поэтому без
+# ожидания первый play падает на сборе фактов:
+#     "ssh: connect to host <IP> port 22: Connection refused"  (sshd ещё не слушает)
+#     "ssh: connect to host <IP> port 22: Connection timed out" (VM ещё грузится)
+#
+# wait_for_connection идемпотентно ждёт восстановления SSH-сессии (ретраи + пауза).
+# Ожидание — ответственность Ansible (конфигурация), а не Terraform (провижининг).
+- name: Ожидание готовности VM по SSH
+  hosts: astra            # mon, prom, app-01 — все целевые VM в этой группе
+  gather_facts: false     # факты соберёт следующий play, уже по живому SSH
+
+  tasks:
+    - name: Ждать, пока поднимется SSH на VM
+      ansible.builtin.wait_for_connection:
+        delay: 5            # первая попытка через 5 c после старта play
+        timeout: 600        # ждать до 10 мин (холодный старт Astra + cloud-init)
+        sleep: 5            # пауза между попытками
+        connect_timeout: 5  # таймаут одной попытки подключения
+
 # Блок 1: Базовая настройка всех VM
 - name: Базовая настройка всех VM
   hosts: astra
