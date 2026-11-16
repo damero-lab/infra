@@ -1,8 +1,44 @@
 # =============================================================================
 # Роль: zabbix-api (Прямой вызов через ansible.builtin.uri)
+#
+# Порядок:
+#   1. Дождаться, что API отвечает (apiinfo.version — без авторизации).
+#   2. Авторизоваться паролем Admin из Vault.
+#   3. Если пароль не подошёл (свежая БД) — bootstrap: войти дефолтным паролем
+#      образа, сменить его на пароль из Vault, войти заново.
+#   4. Группа/шаблон/хосты (ниже).
+#
+# Зачем bootstrap: официальный образ Zabbix создаёт БД с ДЕФОЛТНЫМ паролем Admin
+# (zabbix_api_default_admin_password). Пароль из Vault при init БД никто не
+# кладёт, поэтому на свежей VM (после destroy) он не подходит. Раньше «работало»
+# лишь потому, что пароль был выставлен вне кода и жил в БД — destroy его стирает.
+# Теперь пароль Admin приводится к состоянию из Vault кодом (идемпотентно).
 # =============================================================================
 
-- name: Авторизация в Zabbix API
+# -----------------------------------------------------------------------------
+# 1. Готовность API (apiinfo.version не требует авторизации)
+# -----------------------------------------------------------------------------
+- name: Дождаться готовности Zabbix API
+  ansible.builtin.uri:
+    url: "http://172.16.0.200:8080/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "apiinfo.version"
+      params: []
+      id: 0
+    status_code: 200
+  register: zabbix_api_probe
+  until: zabbix_api_probe.status | default(0) == 200
+  retries: 30
+  delay: 10
+  changed_when: false
+
+# -----------------------------------------------------------------------------
+# 2. Авторизация паролем Admin из Vault
+# -----------------------------------------------------------------------------
+- name: Авторизация в Zabbix API (пароль из Vault)
   ansible.builtin.uri:
     url: "http://172.16.0.200:8080/api_jsonrpc.php"
     method: POST
@@ -11,11 +47,117 @@
       jsonrpc: "2.0"
       method: "user.login"
       params:
-        username: "Admin"
+        username: "{{ zabbix_api_admin_user }}"
         password: "{{ vault_zabbix_admin_password }}"
       id: 1
     status_code: 200
-  register: zabbix_auth
+  register: zabbix_auth_vault
+  changed_when: false
+
+# -----------------------------------------------------------------------------
+# 3. Bootstrap пароля Admin на свежей БД (пароль из Vault ещё не подходит)
+# -----------------------------------------------------------------------------
+- name: Bootstrap пароля администратора Zabbix
+  when: (zabbix_auth_vault.json.result | default('')) | length == 0
+  block:
+    - name: Войти дефолтным паролем образа Zabbix
+      ansible.builtin.uri:
+        url: "http://172.16.0.200:8080/api_jsonrpc.php"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_api_admin_user }}"
+            password: "{{ zabbix_api_default_admin_password }}"
+          id: 2
+        status_code: 200
+      register: zabbix_auth_default
+      changed_when: false
+      until: (zabbix_auth_default.json.result | default('')) | length > 0
+      retries: 30
+      delay: 10
+
+    - name: Получить ID пользователя Admin
+      ansible.builtin.uri:
+        url: "http://172.16.0.200:8080/api_jsonrpc.php"
+        method: POST
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ zabbix_auth_default.json.result }}"
+        body:
+          jsonrpc: "2.0"
+          method: "user.get"
+          params:
+            filter:
+              username: "{{ zabbix_api_admin_user }}"
+          id: 3
+        status_code: 200
+      register: zabbix_admin_info
+      changed_when: false
+      failed_when: (zabbix_admin_info.json.result | default([])) | length == 0
+
+    - name: Сменить пароль Admin на пароль из Vault
+      ansible.builtin.uri:
+        url: "http://172.16.0.200:8080/api_jsonrpc.php"
+        method: POST
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ zabbix_auth_default.json.result }}"
+        body:
+          jsonrpc: "2.0"
+          method: "user.update"
+          params:
+            userid: "{{ zabbix_admin_info.json.result[0].userid }}"
+            # Zabbix требует ТЕКУЩИЙ пароль при смене собственного пароля,
+            # иначе: "Invalid params: Current password is mandatory."
+            current_passwd: "{{ zabbix_api_default_admin_password }}"
+            passwd: "{{ vault_zabbix_admin_password }}"
+          id: 4
+        status_code: 200
+      register: zabbix_password_update
+      changed_when: zabbix_password_update.json.result is defined
+      failed_when: zabbix_password_update.json.error is defined
+
+    - name: Повторный вход уже паролем из Vault
+      ansible.builtin.uri:
+        url: "http://172.16.0.200:8080/api_jsonrpc.php"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_api_admin_user }}"
+            password: "{{ vault_zabbix_admin_password }}"
+          id: 5
+        status_code: 200
+      register: zabbix_auth_relogin
+      changed_when: false
+
+# -----------------------------------------------------------------------------
+# 4. Токен сессии — в одну переменную.
+#
+# ВАЖНО: регистры внутри блока нельзя переиспользовать снаружи. Если блок
+# пропущен (пароль из Vault сразу подошёл), его внутренние register-переменные
+# всё равно получат результат "skipped" и ЗАТРУТ прежнее значение — поэтому
+# токен собираем явно в zabbix_token.
+# -----------------------------------------------------------------------------
+- name: Зафиксировать токен сессии Zabbix
+  ansible.builtin.set_fact:
+    zabbix_token: >-
+      {{ zabbix_auth_vault.json.result
+         if (zabbix_auth_vault.json.result | default('')) | length > 0
+         else (zabbix_auth_relogin.json.result | default('')) }}
+
+- name: Проверить, что авторизация в Zabbix API прошла
+  ansible.builtin.assert:
+    that: zabbix_token | length > 0
+    success_msg: "Zabbix API: авторизация OK"
+    fail_msg: >-
+      Не удалось авторизоваться в Zabbix API: ни паролем из Vault, ни дефолтным
+      ({{ zabbix_api_default_admin_password }}). Проверь vault_zabbix_admin_password в Vault.
 
 - name: Получить ID группы хостов
   ansible.builtin.uri:
@@ -23,7 +165,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "hostgroup.get"
@@ -40,7 +182,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "template.get"
@@ -57,7 +199,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "host.get"
@@ -79,7 +221,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "host.update"
@@ -103,7 +245,7 @@
     method: POST
     body_format: json
     headers:
-      Authorization: "Bearer {{ zabbix_auth.json.result }}"
+      Authorization: "Bearer {{ zabbix_token }}"
     body:
       jsonrpc: "2.0"
       method: "host.create"

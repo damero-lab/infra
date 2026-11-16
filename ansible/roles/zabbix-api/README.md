@@ -28,9 +28,15 @@
 *   `zabbix_api_agent_port` - Порт агента (по умолчанию 10050).
 *   `zabbix_api_hosts` - Список словарей `{name, ip}` для регистрации (задается в `defaults/main.yml`).
 *   `vault_zabbix_admin_password` - Пароль администратора Zabbix (хранится в Ansible Vault).
+*   `zabbix_api_admin_user` - Имя администратора (по умолчанию `Admin`).
+*   `zabbix_api_default_admin_password` - Дефолтный пароль Admin в свежей БД образа
+    Zabbix (по умолчанию `zabbix`). Не секрет — нужен только для bootstrap.
 
 ## Как это работает
-1. Авторизация в API (`user.login`) и получение токена.
+1. Готовность API (`apiinfo.version`) и авторизация (`user.login`) паролем из Vault.
+   Если пароль не подошёл (свежая БД) — **bootstrap**: вход дефолтным паролем образа,
+   `user.update` пароля на значение из Vault, повторный вход. Так пароль Admin
+   приводится к состоянию из Vault **кодом** (идемпотентно) и переживает `destroy`.
 2. Получение ID группы и шаблона.
 3. Проверка существующих хостов (`host.get`). Формирование списка `existing_host_names`.
 4. Обновление существующих хостов (`host.update`) — исправляет `127.0.0.1` на правильный IP.

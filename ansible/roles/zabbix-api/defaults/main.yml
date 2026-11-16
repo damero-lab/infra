@@ -17,3 +17,12 @@ zabbix_api_template: "Linux by Zabbix agent"
 
 # Порт, на котором слушает агент
 zabbix_api_agent_port: 10050
+
+# Пользователь-администратор Zabbix (по умолчанию Admin)
+zabbix_api_admin_user: "Admin"
+
+# ДЕФОЛТНЫЙ пароль Admin в СВЕЖЕЙ БД официального образа Zabbix.
+# Это публично известное значение образа (не секрет), нужно только для bootstrap:
+# на первом старте БД создаётся именно с ним, после чего роль меняет пароль
+# на vault_zabbix_admin_password (см. tasks/main.yml).
+zabbix_api_default_admin_password: "zabbix"
