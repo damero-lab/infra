@@ -218,7 +218,7 @@ infra/
 - Добавить **PR-валидацию в CI**: `terraform plan`, `ansible-lint`, `--syntax-check` на `pull_request`.
 - Автоматизировать **ротацию пароля Grafana** (смена секрета в Vault не меняет пароль в БД).
 - Перегенерировать SVG-схемы (`docs/images/*.svg`, light/dark) при изменении Mermaid-исходника.
-- **Запинить версии образов** — сейчас Zabbix тянется как `...-latest`, образ может «уехать» между прогонами.
+- **Запинить тег Postgres** — образы Zabbix 7.0 уже пиннуты (`alpine-7.0.32`); `postgres:16-alpine` остаётся minor-плавающим.
 - **Acceptance-тест «с нуля»** в CI: `destroy → apply → ansible-playbook` — только он ловит баги первого старта.
 - Автоматизировать **ротацию пароля Zabbix Admin** (как у Grafana: смена секрета в Vault не меняет пароль в БД).
 
