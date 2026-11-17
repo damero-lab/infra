@@ -41,7 +41,7 @@ ERROR:  relation "role" already exists
 |---|---|---|
 | `zabbix_stack_dir` | `/opt/zabbix` | Папка для стека |
 | `zabbix_version` | `7.0.32` | Версия Zabbix 7.0 LTS (пиннутый тег образов) |
-| `zabbix_postgres_image` | `postgres:16-alpine` | Образ БД |
+| `zabbix_postgres_image` | `postgres:16.16-alpine` | Образ БД (пиннутый патч-тег) |
 | `zabbix_server_port` | `10051` | Порт Zabbix Server |
 | `zabbix_web_port` | `8080` | Порт Web UI |
 | `zabbix_php_timezone` | `Europe/Moscow` | Timezone для Frontend |

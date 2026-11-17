@@ -18,8 +18,10 @@ zabbix_stack_dir: /opt/zabbix
 #   (zabbix/zabbix-server-pgsql, тег `alpine-7.0.32`).
 # При обновлении — менять версию осознанно и прогонять плейбук.
 zabbix_version: "7.0.32"
-# Postgres здесь осознанно оставлен на minor-плавающем теге (в проде пиннят, напр. 16.16-alpine).
-zabbix_postgres_image: "postgres:16-alpine"
+# Postgres тоже пиннут по патч-версии: 16.16 — последний патч линии 16
+#   (сверено с официальным манифестом docker-library/official-images).
+# В проде дополнительно фиксируют digest (`image@sha256:…`) — тег можно перезаписать.
+zabbix_postgres_image: "postgres:16.16-alpine"
 zabbix_server_image: "zabbix/zabbix-server-pgsql:alpine-{{ zabbix_version }}"
 zabbix_web_image: "zabbix/zabbix-web-nginx-pgsql:alpine-{{ zabbix_version }}"
 
