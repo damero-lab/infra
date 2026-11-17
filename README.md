@@ -68,6 +68,8 @@ flowchart TD
 - **Провижининг VM** — **Terraform** (`bpg/proxmox`): клонирует шаблон `101`, настраивает сеть через cloud-init, генерирует инвентарь Ansible.
 - **Конфигурация** — **Ansible**: hardening + UFW, Docker, Zabbix, node_exporter, Prometheus, Grafana.
 - **Оркестрация** — **GitHub Actions**: ручной запуск из GitHub UI, выполняется на self-hosted runner (`mgmt`).
+- **Готовность VM** — Ansible первым play ждёт SSH, завершения `cloud-init` и освобождения dpkg-лока
+  (иначе `destroy → apply` падает на гонке «первого старта»).
 
 **Единый источник правды — `terraform/environments/homelab/vms.auto.tfvars`.** Добавить хост =
 добавить запись в реестр; инвентарь Ansible (`hosts.yml`) пересобирается сам и в Git не хранится
@@ -182,7 +184,7 @@ infra/
 ├── ansible/
 │   ├── ansible.cfg           # inventory, SSH-ключ, Vault (запуск из этой папки)
 │   ├── inventories/homelab/  # group_vars (main.yml + vault.yml); hosts.yml — генерируется
-│   ├── playbooks/site.yml    # 5 play: common → zabbix → zabbix-api → prometheus → grafana
+│   ├── playbooks/site.yml    # 6 play: readiness → common → zabbix → zabbix-api → prometheus → grafana
 │   └── roles/                # common, docker, zabbix-server, zabbix-agent,
 │                             # zabbix-api, node_exporter, prometheus, grafana
 ├── docs/
@@ -216,6 +218,9 @@ infra/
 - Добавить **PR-валидацию в CI**: `terraform plan`, `ansible-lint`, `--syntax-check` на `pull_request`.
 - Автоматизировать **ротацию пароля Grafana** (смена секрета в Vault не меняет пароль в БД).
 - Перегенерировать SVG-схемы (`docs/images/*.svg`, light/dark) при изменении Mermaid-исходника.
+- **Запинить версии образов** — сейчас Zabbix тянется как `...-latest`, образ может «уехать» между прогонами.
+- **Acceptance-тест «с нуля»** в CI: `destroy → apply → ansible-playbook` — только он ловит баги первого старта.
+- Автоматизировать **ротацию пароля Zabbix Admin** (как у Grafana: смена секрета в Vault не меняет пароль в БД).
 
 ---
 
