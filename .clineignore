@@ -49,3 +49,12 @@ ansible/inventories/homelab/hosts.yml
 .DS_Store
 Thumbs.db
 node_modules/
+
+# --- Тяжелые файлы зависимостей и кэши (экономия токенов) ---
+.terraform.lock.hcl
+.terragrunt-cache/
+.ansible/
+__pycache__/
+*.pyc
+*.tar.gz
+*.zip
