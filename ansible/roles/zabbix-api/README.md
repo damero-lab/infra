@@ -22,6 +22,16 @@
    В учебных целях IP-адреса хостов прописаны в переменной `zabbix_api_hosts` (в `defaults/main.yml`). 
    В продакшене эти данные должны динамически подтягиваться из Terraform (файлы `.tfstate` или `.env`).
 
+4. **Bootstrap пароля Admin**:
+   На свежей БД пароль Admin — дефолтный (`zabbix`), а не из Vault. Роль входит дефолтным
+   паролем, меняет его на `vault_zabbix_admin_password` (`user.update` + `current_passwd`)
+   и входит заново. Идемпотентно, переживает `destroy`.
+
+5. **`register` внутри `block` с `when`**:
+   Если блок пропущен, его внутренние `register`-переменные всё равно получают результат
+   «skipped» и **затирают** прежнее значение. Поэтому у роли разные имена
+   (`zabbix_auth_vault` / `zabbix_auth_relogin`), а рабочий токен собирается в `zabbix_token`.
+
 ## Переменные
 *   `zabbix_api_host_group` - Имя группы хостов в Zabbix.
 *   `zabbix_api_template` - Имя шаблона (например, `Linux by Zabbix agent`).
