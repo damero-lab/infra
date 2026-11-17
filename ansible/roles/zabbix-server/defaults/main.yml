@@ -13,10 +13,15 @@ zabbix_stack_dir: /opt/zabbix
 # -----------------------------------------------------------------------------
 # Версии Docker-образов
 # -----------------------------------------------------------------------------
-zabbix_version: "7.0"
+# Пинуем конкретный тег — не используем :latest (воспроизводимость).
+# 7.0.32 — патч LTS-линии Zabbix 7.0; версия сверена с Docker Hub
+#   (zabbix/zabbix-server-pgsql, тег `alpine-7.0.32`).
+# При обновлении — менять версию осознанно и прогонять плейбук.
+zabbix_version: "7.0.32"
+# Postgres здесь осознанно оставлен на minor-плавающем теге (в проде пиннят, напр. 16.16-alpine).
 zabbix_postgres_image: "postgres:16-alpine"
-zabbix_server_image: "zabbix/zabbix-server-pgsql:alpine-{{ zabbix_version }}-latest"
-zabbix_web_image: "zabbix/zabbix-web-nginx-pgsql:alpine-{{ zabbix_version }}-latest"
+zabbix_server_image: "zabbix/zabbix-server-pgsql:alpine-{{ zabbix_version }}"
+zabbix_web_image: "zabbix/zabbix-web-nginx-pgsql:alpine-{{ zabbix_version }}"
 
 # -----------------------------------------------------------------------------
 # Настройки БД
